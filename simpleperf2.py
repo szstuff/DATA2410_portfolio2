@@ -100,7 +100,7 @@ def server(ip, port, reliability, testcase):
 
 
 def client(ip, port, filename, reliability, testcase):
-    # creating the socket and server address touple
+    # creating the socket and server address tuple
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
     serverAddress = (ip, port)
 
@@ -228,7 +228,7 @@ parser.add_argument('-s', '--server', action='store_true', default=False, help="
 parser.add_argument('-c', '--client', action='store_true', default=False, help="Start in client mode")
 parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
-# parser.add_argument('-f', '--file', type=XXX, default=None, help="Path to file to transfer")
+parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
 parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="XXXX")
 parser.add_argument('-t', '--testcase', type=None, default=None, help="XXXX")
 args = parser.parse_args()  # Parses arguments provided by user
