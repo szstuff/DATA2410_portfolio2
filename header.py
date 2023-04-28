@@ -22,6 +22,7 @@ def create_packet(seq, ack, flags, win, data):
     # flags (we only use 4 bits),  receiver window and application data
     # struct.pack returns a bytes object containing the header values
     # packed according to the header_format !IIHH
+    header_format = '!IIHH'
     header = pack(header_format, seq, ack, flags, win)
 
     # once we create a header, we add the application data to create a packet
@@ -29,6 +30,17 @@ def create_packet(seq, ack, flags, win, data):
     packet = header + data
     print(f'packet containing header + data of size {len(packet)}')  # just to show the length of the packet
     return packet
+
+seqNum, ackNum, flags, windowSize = 0,0,0,0
+data = 'Hello World!' * 100
+
+# creates a packet
+packet = create_packet(seqNum,ackNum, flags, windowSize, data)
+
+# prints the packet size
+print(f'Packet size : {len(packet)}')
+
+
 
 
 def parse_header(header):
