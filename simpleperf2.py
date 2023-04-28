@@ -185,7 +185,7 @@ def extract_seq_num(packet):
 # Check-metoder
 ###
 
-def test_case(reliable, socket):
+def test_case(reliable, socket, filename):
     WINDOW_SIZE = random.randint(10, 1000)
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
@@ -304,7 +304,7 @@ parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
 parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
 parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="XXXX")
-parser.add_argument('-t', '--testcase', type=None, default=None, help="XXXX")
+parser.add_argument('-t', '--testcase', type=test_case, default=None, help="XXXX")
 args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
