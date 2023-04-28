@@ -1,3 +1,4 @@
+import header
 import random
 import socket
 import threading
@@ -8,7 +9,7 @@ import time
 import datetime
 import struct
 import os
-from fileinput import filename
+from header import *
 
 
 def server(ip, port, reliability, testcase):
@@ -152,6 +153,10 @@ def client(ip, port, filename, reliability, testcase):
         # chunk = bytes(str(chunk), "utf-8")
         # client_socket.sendto(chunk, serverAddress)
         # print(chunk.decode("utf-8"))
+
+        # Creates DRTP header and sends the packet to the server
+        header_pack = header.create_packet(1, 1, 4, 64)
+        client_socket.sendto(header_pack, serverAddress)
 
         # SEND INDEX
         client_socket.sendto(str(index).encode(), serverAddress)
