@@ -33,9 +33,6 @@ def create_packet(seq, ack, flags, win, data):
 
 
 def parse_header(header):
-    if header == None:
-        return None
-
 
     # takes a header of 12 bytes as an argument,
     # unpacks the value based on the specified header_format
