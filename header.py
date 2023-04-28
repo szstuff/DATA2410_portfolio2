@@ -22,7 +22,6 @@ def create_packet(seq, ack, flags, win, data):
     # flags (we only use 4 bits),  receiver window and application data
     # struct.pack returns a bytes object containing the header values
     # packed according to the header_format !IIHH
-    header_format = '!IIHH'
     header = pack(header_format, seq, ack, flags, win)
 
     # once we create a header, we add the application data to create a packet
@@ -44,7 +43,11 @@ print(f'Packet size : {len(packet)}')
 
 
 def parse_header(header):
-    # taks a header of 12 bytes as an argument,
+    if header == None:
+        return None
+
+
+    # takes a header of 12 bytes as an argument,
     # unpacks the value based on the specified header_format
     # and return a tuple with the values
     header_from_msg = unpack(header_format, header)
