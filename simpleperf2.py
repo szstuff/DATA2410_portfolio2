@@ -1,3 +1,4 @@
+import random
 import socket
 import threading
 import argparse
@@ -7,6 +8,7 @@ import time
 import datetime
 import struct
 import os
+from fileinput import filename
 
 
 def server(ip, port, reliability, testcase):
@@ -169,10 +171,82 @@ def client(ip, port, filename, reliability, testcase):
 
 # def wait
 # def stop
+def make_packet(seq_num, data):
+    # Construct a packet by appending the sequence number and data
+    return str(seq_num).zfill(4).encode() + data
+
+
+def extract_seq_num(packet):
+    # Extract the sequence number from the packet
+    return int(packet[:4])
+
 
 ###
 # Check-metoder
 ###
+
+def test_case(reliable, socket, filename):
+    WINDOW_SIZE = random.randint(10, 1000)
+    # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
+    # for ACK of the previous packet.
+    if reliable == "gbn":
+        print("Skip ACK for GBN")
+        # Skip an ACK for Go-Back-N
+        data, addr = socket.recvfrom(1024)
+        seq_num = int(data[:1024])
+        if random.random() < 0.5:  # Skip ACK with 50% chance
+            print(f"Skip ACK for packet with sequence number: {seq_num}")
+            return
+        # If not 50% chance, send ACK as usual
+        socket.sendto(seq_num, addr)
+
+    # Selective Repeat is a protocol which let the receiver send ACK for all received packets.
+    # Sender can therefore retransmit missing packets
+    elif reliable == "sr":
+        print("SR test case where ACK is lost")
+        # Open the file to be transferred
+        try:
+            file = open(filename, "rb")
+        except FileNotFoundError:
+            print("Error: Could not open file.")
+            return
+
+        # Read the file data in chunks and send it to the receiver
+        seq_num = 0
+        packets = []
+        while True:
+            data = file.read(1024)
+            if not data:
+                break
+            packet = make_packet(seq_num, data)
+            packets.append(packet)
+            seq_num += 1
+        file.close()
+
+        # Send the packets to the receiver
+        expected_seq_num = 0
+        while True:
+            try:
+                # Send the current window of packets
+                window_start = expected_seq_num
+                window_end = min(window_start + WINDOW_SIZE, len(packets))
+                for i in range(window_start, window_end):
+                    socket.sendto(packets[i], (args.ip, args.port))
+
+                # Receive ACK from the receiver
+                ack_packet, address = socket.recvfrom(1024)
+                ack_seq_num = extract_seq_num(ack_packet)
+                if ack_seq_num == expected_seq_num:
+                    expected_seq_num += 1
+
+            except socket.timeout:
+                # An ACK is lost, re-send the current window of packets
+                continue
+
+            if expected_seq_num == len(packets):
+                print("Transfer complete.")
+                break
+
 
 def checkFile(filename):  # Checks if the file exists in the server's system
     if os.path.isfile(filename):
@@ -230,7 +304,7 @@ parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
 parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
 parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="XXXX")
-parser.add_argument('-t', '--testcase', type=None, default=None, help="XXXX")
+parser.add_argument('-t', '--testcase', type=test_case, default=None, help="XXXX")
 args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
