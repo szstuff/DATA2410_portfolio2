@@ -6,6 +6,7 @@ import re
 import time
 import datetime
 import struct
+import os
 
 
 def server(ip, port, reliability, testcase):
@@ -20,7 +21,7 @@ def server(ip, port, reliability, testcase):
             noport = False
         except OSError:  # Excepts error when server cant bind to provided IP and port
             port = port + 1  # Iterates port for the next bind attempt
-        if (port == 65535):
+        if port == 65535:
             port = 1024  # Used to run through remaining ports in the valid range.
         elif (
                 port == firstPort - 1):  # If the current port is the one prior to the first port, an error message
@@ -80,8 +81,8 @@ def server(ip, port, reliability, testcase):
 
         filename = server_socket.recvfrom(1024)  # Receive data from client
 
-        # Open the file for reading or writing, and use wb to ensure that the data is sent as bytes
-        with open(filename, 'wb') as f:
+        # Open the file , evt use wb to ensure that the data is sent as bytes
+        with open(filename) as f:
             while True:
                 data, serverAddress = server_socket.recvfrom(1024)
                 if not data:
@@ -166,9 +167,20 @@ def client(ip, port, filename, reliability, testcase):
     return 0
 
 
+# def wait
+# def stop
+
 ###
 # Check-metoder
 ###
+
+def checkFile(filename):  # Checks if the file exists in the server's system
+    if os.path.isfile(filename):
+        return True
+    else:
+        return False
+
+
 def checkIP(val):  # Checks input of -i flag
     if val == "localhost":  # Used to skip regex, as "localhost" does not match the pattern of an IPv4 address
         return "localhost"
