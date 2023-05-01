@@ -1,5 +1,4 @@
 import header
-import random
 import socket
 import threading
 import argparse
@@ -110,7 +109,7 @@ def client(ip, port, filename, reliability, testcase):
     serverAddress = (ip, port)
 
     # Ping server and set client timeout
-    client_socket.settimeout(500)
+    client_socket.settimeout(0.5)
     done = False
     timeout = None
     while not done:
@@ -135,15 +134,18 @@ def client(ip, port, filename, reliability, testcase):
 
     # Start file transfer
     done = False
-    file = open("index.html", "rb")
-    index = 0
-    client_socket.sendto("FILE".encode(), serverAddress)
-    while not done:
-        print(f"Sending chunk " + str(index), end="\r")
-        data = file.read(950)  # Transfer 950 bytes at a time, reserving 74 out of 1024 bytes for index
-        if not data:
-            done = True
-            break
+    with open(filename, "rb") as f:
+        f_data = f.read()
+        f_size = len(f_data)
+        file = open("index.html", "rb")
+        client_socket.sendto("FILE".encode(), serverAddress)
+        index = 0
+        while not done:
+            print(f"Sending chunk " + str(index), end="\r")
+            data = file.read(950)  # Transfer 950 bytes at a time, reserving 74 out of 1024 bytes for index
+            if not data:
+                done = True
+                break
 
         print("INDEX")
         print(index)
@@ -210,7 +212,7 @@ def stop_wait(filename, socket):
                 print(f"Sent packet with sequence number: {seq_num}")
 
                 # Wait for ACK
-                socket.settimeout(1)  # Waits for ack from server
+                socket.settimeout(0.5)  # Waits for ack from server
                 ack_packet = socket.recvform(1024)
                 ack_seq_num = extract_seq_num(ack_packet)
 
@@ -283,7 +285,7 @@ def gbn(filename, socket):
 
 
 def sr(filename, socket):
-    socket.settimeout(1)  # Set timeout to 1s
+    socket.settimeout(0.5)  # Set timeout to 500ms
     WINDOW_SIZE = 5  # Set window size to 5 packets
 
     # Initialize variables
@@ -398,8 +400,8 @@ parser.add_argument('-c', '--client', action='store_true', default=False, help="
 parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
 parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
-parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="XXXX")
-parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="XXXX")
+parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="Choose reliable method (GBN or SR)")
+parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="Test case to run (skip_ack)")
 args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
