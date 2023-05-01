@@ -37,16 +37,27 @@ def server(ip, port, reliability, testcase):
     # The requests it can handle are:
     # PING: Respond to ping from client
     # FILE: Receive file
+    sequence_number = 0
+    acknowledgment_number = 0
+    window = 0
+    received_sequence = set()
+
     while True:
-        msg, client_address = server_socket.recvfrom(1024)
-        msg = msg.decode()
+        data, client_address = server_socket.recvfrom(1024)
+        print("DATA")
+        print(data)
+        header = data[:12]  # Extract header from message
+        seq, ack, flags, win = parse_header(data)
         if "PING" in msg:
             print(f"Received PING from client", end="\r")
-            server_socket.sendto("ACK:PING".encode(), client_address)
+            data = "ACK:PING"
+            flags = 4  # "ACK" flag 0 1 0 0
+            packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
+
+            server_socket.sendto(packet, client_address)
         elif "FILE" in msg:
             print("preparing to receive file from client " + str(client_address))
             # Storing indexes in a set as these are more efficient for this use case
-            received_chunks = set()
             ##Mangler kode for å motta filnavn
             filename = ""
             ########
@@ -54,23 +65,20 @@ def server(ip, port, reliability, testcase):
             lastIndex = -1
             while True:
                 # Server first receives the index
-                index, addr = server_socket.recvfrom(1024)
-                index = index.decode()
-                print(str(index))
+                data, addr = server_socket.recvfrom(1024)
+                header = data[:12] # Extract header from message
+                seq, ack, flags, win = parse_header(data)
                 # If index is "END", the client is done transferring the file
-                if "END" in index:
+                if flags == 8: #If flags == FIN
                     break
                 # Server then receives the payload
-                payload, addr = server_socket.recvfrom(1024)
-                payload = payload.decode()
-                print(payload)
-                print(f"Recieving chunk " + str(index), end="\r")
+                print(f"Recieving chunk " + str(seq), end="\r")
 
-                if lastIndex == int(index) - 1:
+                if lastIndex == int(seq) - 1:
                     # Append incoming data to file variable
-                    file += str(payload)
-                    print("mottatt" + str(index))
-                    ack = "ACK:" + str(index)
+                    file += str(data[13:])
+                    print("mottatt" + str(seq))
+                    ack = create_packet(0, seq, 4, flags, window, None)
                     server_socket.sendto(ack.encode(), client_address)
                 elif False:
                     print("hei2")
@@ -110,22 +118,34 @@ def client(ip, port, filename, reliability, testcase):
     serverAddress = (ip, port)
 
     # Ping server and set client timeout
-    client_socket.settimeout(500)
+    client_socket.settimeout(0.5)
     done = False
     timeout = None
+    sequence_number = 1
+    acknowledgment_number = 0
+    window = 0
+    flags = 0
+
     while not done:
         print(f"Pinging server", end="\r")
+
+        ## FEIL MATTE PÅ TIMEOUT
+        data = "PING"
+        packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
         startTime = time.time()
-        client_socket.sendto("PING".encode(), serverAddress)
+        client_socket.sendto(packet, serverAddress)
+        sequence_number += 1
         response, null = client_socket.recvfrom(1024)
-        if "ACK:PING" in response.decode():
+        seq, ack, flags, win = parse_header(response)
+
+        if flags == 4: #If flags == ACK
             timeout = time.time() - startTime
 
             # Setting timeout. If RTT is lower than 10ms, timeout is set to a safe low value of 50ms
             # Otherwise, it's set to 4*RTT
             if timeout < 0.01:
                 print("RTT is lower than 10ms. Setting client timeout to 50ms. Actual RTT: " + str(round(timeout * 1000, 2)) + "ms")
-                client_socket.settimeout(50)
+                client_socket.settimeout(0.05)
             else:
                 print("RTT: " + str(round(timeout * 1000, 2)) + "ms. Setting client timeout to " + str(round(4 * timeout * 1000, 2)))
                 client_socket.settimeout(4 * timeout)
@@ -136,31 +156,29 @@ def client(ip, port, filename, reliability, testcase):
     # Start file transfer
     done = False
     file = open("index.html", "rb")
-    index = 0
-    client_socket.sendto("FILE".encode(), serverAddress)
     while not done:
         print(f"Sending chunk " + str(index), end="\r")
-        data = file.read(950)  # Transfer 950 bytes at a time, reserving 74 out of 1024 bytes for index
+        data = file.read(1000)  # Transfer 1000 bytes at a time, reserving 24 out of 1024 bytes for index
         if not data:
             done = True
             break
 
-        print("INDEX")
-        print(index)
-        print("DATA")
+        print("SEQ NR:")
+        print(sequence_number)
+        print("DATA:")
         print(data)
         # chunk = (index, data)
         # chunk = bytes(str(chunk), "utf-8")
         # client_socket.sendto(chunk, serverAddress)
         # print(chunk.decode("utf-8"))
 
-        # Creates DRTP header and sends the packet to the server
-        header_pack = header.create_packet(1, 1, 4, 64)
-        client_socket.sendto(header_pack, serverAddress)
 
-        # SEND INDEX
-        client_socket.sendto(str(index).encode(), serverAddress)
-        client_socket.sendto(str(data).encode(), serverAddress)
+
+        ## STILIAN fortsett herfra <33333 xoxo
+        # Creates DRTP header and sends the packet to the server
+        packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
+        client_socket.sendto(packet, serverAddress)
+        sequence_number += 1
 
         response, null = client_socket.recvfrom(1024)
         expectedResponse = "ACK:" + str(index)
