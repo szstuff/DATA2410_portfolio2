@@ -84,18 +84,20 @@ def server(ip, port, reliability, testcase):
 
         filename = server_socket.recvfrom(1024)  # Receive data from client
 
-        # Open the file , evt use wb to ensure that the data is sent as bytes
-        with open(filename) as f:
-            while True:
-                data, serverAddress = server_socket.recvfrom(1024)
-                if not data:
-                    break
-                f.write(data)  # Write the received data to the file
 
-                if reliability:
-                    # send acknowledgment to client
-                    msg = "ACK".encode()
-                    server_socket.sendto(msg, serverAddress)
+        ##### Kommentert ut ettersom dette ikke brukes av programmet (foreløpig?).
+        # Open the file , evt use wb to ensure that the data is sent as bytes
+        # with open(filename) as f:
+        #     while True:
+        #         data, serverAddress = server_socket.recvfrom(1024)
+        #         if not data:
+        #             break
+        #         f.write(data)  # Write the received data to the file
+        #
+        #         if reliability:
+        #             # send acknowledgment to client
+        #             msg = "ACK".encode()
+        #             server_socket.sendto(msg, serverAddress)
 
         server_socket.close()
 
@@ -117,17 +119,15 @@ def client(ip, port, filename, reliability, testcase):
         client_socket.sendto("PING".encode(), serverAddress)
         response, null = client_socket.recvfrom(1024)
         if "ACK:PING" in response.decode():
-            timeout = 4 * (time.time() - startTime)
+            timeout = time.time() - startTime
 
             # Setting timeout. If RTT is lower than 10ms, timeout is set to a safe low value of 50ms
             # Otherwise, it's set to 4*RTT
             if timeout < 0.01:
-                print("RTT is lower than 10ms. Setting client timeout to 50ms. Actual RTT: " + str(
-                    round(timeout * 1000, 2)) + "ms")
+                print("RTT is lower than 10ms. Setting client timeout to 50ms. Actual RTT: " + str(round(timeout * 1000, 2)) + "ms")
                 client_socket.settimeout(50)
             else:
-                print("RTT: " + str(round(timeout * 1000, 2)) + "ms. Setting client timeout to " + str(
-                    round(4 * timeout * 1000, 2)))
+                print("RTT: " + str(round(timeout * 1000, 2)) + "ms. Setting client timeout to " + str(round(4 * timeout * 1000, 2)))
                 client_socket.settimeout(4 * timeout)
             done = True
         else:
@@ -356,8 +356,6 @@ def checkIP(val):  # Checks input of -i flag
             if int(byte) < 0 or int(byte) > 255:
                 raise argparse.ArgumentTypeError(str(val) + "is not a valid IPv4 address")
     return val  # Return user specified IP if all checks pass
-
-
 def checkPort(val):  # Checks input of -p port flag
     try:
         value = int(val)  # Port must be an integer
@@ -366,8 +364,6 @@ def checkPort(val):  # Checks input of -p port flag
     if value < 1024 or value > 65535:  # Port must be in valid range
         raise argparse.ArgumentTypeError(str(value) + " is not a valid port")
     return value
-
-
 def checkReliability(val):
     val = val.upper()
     if val == None:
@@ -380,9 +376,18 @@ def checkReliability(val):
         return "SR"
     else:
         raise Exception(
-            "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(
-                val))
+            "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(val))
 
+def checkTestCase(val):
+    val = val.upper()
+    if val == None:
+        return None
+    elif val == "SKIP_ACK" or val == "SKIPACK":
+        return "SKIP_ACK"
+    elif val == "LOSS":
+        return "LOSS"
+    else:
+        raise Exception("Could not parse -t testcase input. Expected: \"SKIP_ACK\" or \"LOSS\", Actual: " + str(val))
 
 parser = argparse.ArgumentParser(description="positional arguments",
                                  epilog="end of help")  # Initialises argsparse parser
@@ -394,7 +399,7 @@ parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
 parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
 parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="XXXX")
-parser.add_argument('-t', '--testcase', type=None, default=None, help="XXXX")
+parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="XXXX")
 args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
