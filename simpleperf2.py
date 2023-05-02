@@ -120,13 +120,13 @@ def client(ip, port, filename, reliability, testcase):
     serverAddress = (ip, port)
 
     # Ping server and set client timeout
-    client_socket.settimeout(0.5)
-    done = False
-    timeout = None
-    sequence_number = 1
-    acknowledgment_number = 0
-    window = 0
-    flags = 0
+    client_socket.settimeout(0.5) # Set timeout for client
+    done = False # Indicate completion of a task
+    timeout = None # Time elapsed between sending a packet and receiven ACK
+    sequence_number = 1 # Sequence number for packets being sent
+    acknowledgment_number = 0 # ACK number for packets being sent
+    window = 0 # window size
+    flags = 0 # packet flags
 
     while not done:
         print(f"Sending SYN to server", end="\r")
@@ -172,6 +172,8 @@ def client(ip, port, filename, reliability, testcase):
         startTime = time.time()
         client_socket.sendto(packet, serverAddress)
         sequence_number += 1
+
+        # Receive response and parse header
         response, null = client_socket.recvfrom(1024)
         seq, ack, flags, win = parse_header(response)
 
@@ -273,61 +275,61 @@ def client(ip, port, filename, reliability, testcase):
 def gbn(filename, socket):
     # Open the file to be transferred
     try:
-        file = open(filename, "rb")
+        file = open(filename, "rb")  # Open file with read and binary mode
     except FileNotFoundError:
         print("Error: Could not open file.")
         return
 
     # Read the file data in chunks and send it to the receiver
-    seq_num = 0
-    packets = []
+    seq_num = 0 # Initialize sequence number of the first packet which is going to be sent
+    packets = [] # Create empty array list for packets
     while True:
-        data = file.read(1024)
-        if not data:
+        data = file.read(1024)  # Read 1024 bytes of data from the file
+        if not data:  # If no data to read, break loop
             break
-        packet = make_packet(seq_num, data)
-        packets.append(packet)
-        seq_num += 1
-    file.close()
+            packet = create_packet(seq_num, ack, flags, win, data)   # Create packet with current sequence number, and data that has been read
+        packets.append(packet)  # Add packet to array list
+        seq_num += 1 # Increment sequence of number for next packet
+    file.close()  # Close file
 
-    # Send the packets to the server
-    expected_seq_num = 0
-    window_start = 0
-    window_end = min(window_start + 5, len(packets))
+    # Send the packets to the receiver using a sliding window
+    expected_seq_num = 0  # Initialize expected sequence number of the first ACK received
+    window_start = 0  # Initialize start index of current window of packets to be sent
+    window_end = min(window_start + 5, len(packets)) # Initialize end index of current window
     while True:
         try:
             # Send the current window of packets
             for i in range(window_start, window_end):
-                socket.sendto(packets[i])
+                socket.sendto(packets[i]) # Send packet at index i
                 print(f"Sent packet with sequence number: {i}")
 
             # Receive ACK from the receiver
-            ack_packet, address = socket.recvfrom(1024)
-            ack_seq_num = extract_seq_num(ack_packet)
-            if ack_seq_num >= expected_seq_num:
-                expected_seq_num = ack_seq_num + 1
-                window_start = expected_seq_num
-                window_end = min(window_start + 5, len(packets))
+            ack_packet, address = socket.recvfrom(1024) # Receive packet with an ACK from receiver
+            ack_seq_num = extract_seq_num(ack_packet) # Extract sequence number from ACK packet
+            if ack_seq_num >= expected_seq_num: # If ACK is for the expected sequence number or a later one
+                expected_seq_num = ack_seq_num + 1 # Update the expected sequence number to the next one
+                window_start = expected_seq_num # Move start index of the window to next expected sequence number
+                window_end = min(window_start + 5, len(packets)) # Move end index of th window to the next one
 
-        except socket.timeout:
+        except socket.timeout: # If a timeout happens while waiting for ACK
             # An ACK is lost, re-send the current window of packets
             print(f"Timeout, resending packets with sequence numbers {window_start} to {window_end}")
             continue
 
-        if expected_seq_num == len(packets):
+        if expected_seq_num == len(packets): # If all packets have received ACK
             print("Transfer complete.")
             break
 
 #SR: Du får ack etter hver eneste pakke.
 # sends ack for each packet sent
 def sr(filename, socket):
-    socket.settimeout(1)  # Set timeout to 1s
+    socket.settimeout(0.5)  # Set timeout to 1s
     WINDOW_SIZE = 5  # Set window size to 5 packets
 
     # Initialize variables
     expected_seq_num = 0
-    packets = []
-    received_packets = {}
+    packets = [] # Create array list for packets
+    received_packets = {} # Dictionary to save received packets and their sequence numbers
 
     # Open the file to be transferred
     try:
@@ -339,13 +341,13 @@ def sr(filename, socket):
     # Read the file data in chunks and send it to the receiver
     seq_num = 0
     while True:
-        data = file.read(1024)
-        if not data:
+        data = file.read(1024) # Read 1024 bytes of data from file
+        if not data: # If there is no data to be read, break loop
             break
-        packet = make_packet(seq_num, data)
-        packets.append(packet)
-        seq_num += 1
-    file.close()
+            packet = create_packet(seq_num, ack, flags, win, data)   # Create packet
+        packets.append(packet) # Add packet to the array list
+        seq_num += 1 # Increment sequence number for the next packet
+    file.close() # Close the file
 
     # Send packets to the receiver
     while expected_seq_num < len(packets):
@@ -356,20 +358,20 @@ def sr(filename, socket):
             socket.sendto(packets[i], (args.ip, args.port))
 
         # Receive ACKs from the receiver
-        socket.settimeout(0.5)  # 500 ms timeout
+        socket.settimeout(0.5)  # 500 ms timeout for socket operations
         while True:
             try:
-                ack_packet, address = socket.recvfrom(1024)
-                ack_seq_num = extract_seq_num(ack_packet)
-                if ack_seq_num not in received_packets:
-                    received_packets[ack_seq_num] = True
-                    if ack_seq_num == expected_seq_num:
-                        expected_seq_num += 1
-                        while expected_seq_num in received_packets:
-                            expected_seq_num += 1
+                ack_packet, address = socket.recvfrom(1024) # Receive ACK packet from receiver
+                ack_seq_num = extract_seq_num(ack_packet) # Exctract sequence number from ACK packet using extract_seq_num() method
+                if ack_seq_num not in received_packets: # Check if ACK packet has not been received
+                    received_packets[ack_seq_num] = True # Mark ACK as received
+                    if ack_seq_num == expected_seq_num: # If ACK sequence number matches expected sequence number
+                        expected_seq_num += 1 # Increment expected sequence number
+                        while expected_seq_num in received_packets: # Check if next expected packet has been received
+                            expected_seq_num += 1 # If received, increment expected sequence number
             except socket.timeout:
                 # Timeout occurred, resend unacknowledged packets in window
-                break
+                break # Exit inner while loop, resend unacknowledged packets
 
 
 ###
@@ -434,8 +436,9 @@ parser.add_argument('-s', '--server', action='store_true', default=False, help="
 parser.add_argument('-c', '--client', action='store_true', default=False, help="Start in client mode")
 parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
-parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
-parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="XXXX")
+### FJERN FØR INNLEVERING: index.html. Bytt til None elns
+parser.add_argument('-f', '--file', type=checkFile, default="index.html", help="Path to file to transfer")
+parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="Choose reliable method (GBN or SR)")
 parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="XXXX")
 args = parser.parse_args()  # Parses arguments provided by user
 
@@ -444,6 +447,6 @@ if args.server:
     server(args.ip, args.port, None, None)
 elif args.client:
     print("client starting")
-    client(args.ip, args.port, None, None, None)
+    client(args.ip, args.port, args.reliability, None, None)
 else:
     print("Could not start")
