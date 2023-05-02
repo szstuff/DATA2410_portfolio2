@@ -14,7 +14,7 @@ from struct import *
 header_format = '!IIHH'
 
 #print the header size: total = 12
-print (f'size of the header = {calcsize(header_format)}')
+print(f'size of the header = {calcsize(header_format)}')
 
 
 def create_packet(seq, ack, flags, win, data):
@@ -23,7 +23,7 @@ def create_packet(seq, ack, flags, win, data):
     #flags (we only use 4 bits),  receiver window and application data
     #struct.pack returns a bytes object containing the header values
     #packed according to the header_format !IIHH
-    header = pack (header_format, seq, ack, flags, win)
+    header = pack(header_format, seq, ack, flags, win)
 
     #once we create a header, we add the application data to create a packet
     #of 1472 bytes
@@ -36,11 +36,6 @@ def parse_header(header):
     #taks a header of 12 bytes as an argument,
     #unpacks the value based on the specified header_format
     #and return a tuple with the values
-    print("HEADER PARSE HEADER")
-    print(header)
-    header = header[12:]
-    print("HEADER PARSE HEADER")
-    print(header)
     header_from_msg = unpack(header_format, header)
     #parse_flags(flags)
     return header_from_msg
@@ -102,7 +97,9 @@ def parse_flags(flags):
 # # 0 0 0 0 represents no flags
 # # 0 1 0 0  ack flag set, and the decimal equivalent is 4
 # flags = 4
-#
+# 8 4 2 1 = S A F R
+# 1100 == S A == 12
+
 # msg = create_packet(sequence_number, acknowledgment_number, flags, window, data)
 # print (f'this is an acknowledgment packet of header size={len(msg)}')
 #

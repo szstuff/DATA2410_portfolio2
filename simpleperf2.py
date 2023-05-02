@@ -10,6 +10,7 @@ import datetime
 import struct
 import os
 from header import *
+import math
 
 
 def server(ip, port, reliability, testcase):
@@ -42,18 +43,19 @@ def server(ip, port, reliability, testcase):
     window = 0
     received_sequence = set()
 
+
     while True:
         data, client_address = server_socket.recvfrom(1024)
         print("DATA")
         print(data)
         header = data[:12]  # Extract header from message
-        seq, ack, flags, win = parse_header(data)
+        data = data [12:]
+        seq, ack, flags, win = parse_header(header)
         if "PING" in msg:
             print(f"Received PING from client", end="\r")
             data = "ACK:PING"
             flags = 4  # "ACK" flag 0 1 0 0
             packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
-
             server_socket.sendto(packet, client_address)
         elif "FILE" in msg:
             print("preparing to receive file from client " + str(client_address))
@@ -127,9 +129,44 @@ def client(ip, port, filename, reliability, testcase):
     flags = 0
 
     while not done:
-        print(f"Pinging server", end="\r")
+        print(f"Sending SYN to server", end="\r")
 
-        ## FEIL MATTE PÅ TIMEOUT
+        # ------------ Starten på ny kode knyttet til Three-way handshake  -----------------
+        # Sender sends a SYN (open; “synchronize
+        # sequence numbers”) to receiver
+
+        #Create SYN packet
+        data = "SYN"
+        packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
+        startTime = time.time()
+        client_socket.sendto(packet, serverAddress)
+        sequence_number += 1
+
+        # Receiver returns a SYN acknowledgment (SYN ACK)
+
+        # Receive response and parse header
+        response, null = client_socket.recvfrom(1472)
+        seq, ack, flags, win = parse_header(response)
+
+
+        if flags == 12: # If flags == SYN:ACK
+            print("Received SYN ACK from server")
+
+            # Sender sends an ACK to acknowledge the SYN ACK
+            # Create ACK packet
+            data = "ACK"
+            packet = header.create_packet(sequence_number, ack, 4, window, data.encode())
+            client_socket.sendto(packet, serverAddress)
+            print("Final ACK has been sent to server")
+
+        else:
+            print("Error: Expected SYN ACK from server but received unexpected packet")
+
+        # -------------- slutten på ny kode knyttet til Three-way handshake -------------------
+
+
+        ## FEIL MATTE PÅ TIMEOUT, jeg har gjort noe men vet ikke om det er riktig
+        # Create PING packet
         data = "PING"
         packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
         startTime = time.time()
@@ -145,7 +182,7 @@ def client(ip, port, filename, reliability, testcase):
             # Otherwise, it's set to 4*RTT
             if timeout < 0.01:
                 print("RTT is lower than 10ms. Setting client timeout to 50ms. Actual RTT: " + str(round(timeout * 1000, 2)) + "ms")
-                client_socket.settimeout(0.05)
+                client_socket.settimeout(0.5)
             else:
                 print("RTT: " + str(round(timeout * 1000, 2)) + "ms. Setting client timeout to " + str(round(4 * timeout * 1000, 2)))
                 client_socket.settimeout(4 * timeout)
@@ -155,98 +192,80 @@ def client(ip, port, filename, reliability, testcase):
 
     # Start file transfer
     done = False
-    file = open("index.html", "rb")
-    while not done:
-        print(f"Sending chunk " + str(index), end="\r")
-        data = file.read(1000)  # Transfer 1000 bytes at a time, reserving 24 out of 1024 bytes for index
-        if not data:
-            done = True
-            break
 
-        print("SEQ NR:")
-        print(sequence_number)
-        print("DATA:")
-        print(data)
-        # chunk = (index, data)
-        # chunk = bytes(str(chunk), "utf-8")
-        # client_socket.sendto(chunk, serverAddress)
-        # print(chunk.decode("utf-8"))
+    # Open file in binary mode and read data
+    with open(filename, "rb") as file:
+        file_data = file.read() # Read the contents of the file into a byte string
+        file_size = len(file_data) # Determine size in bytes of the file
+        no_of_packets = int(math.ceil(file_size / 1000)) #Calculate number of packets in total for this file in packets of 1000 bytes
 
+        # Split file into packets of max size 1000 bytes
+        split_file = []
+        for index in range(0, file_size, 1000):
+            split_file.append(file_data[index:index+1000])
 
+        # Print file information
+        print("Opened file: " + str(filename)) # Print name of the opened file
+        print("File size: " + str(file_size) + ", no of packets" + str(no_of_packets)) # Print size of the file and number of packets requiered to send  the file
+        print("No of packets: " + str(len(split_file))) # Print number of packets the file was split into
 
-        ## STILIAN fortsett herfra <33333 xoxo
-        # Creates DRTP header and sends the packet to the server
-        packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
-        client_socket.sendto(packet, serverAddress)
-        sequence_number += 1
+        # Send each packet with the chosen reliability protocol
+        for i, packet_data in enumerate(split_file):
+            print(f"Sending packet {i+1} of {no_of_packets}", end="\r") # Print a progress message of which package is being sent
 
-        response, null = client_socket.recvfrom(1024)
-        expectedResponse = "ACK:" + str(index)
-        if not response.decode() == expectedResponse:
-            print("send ACK REQ på nytt")
+            # Send packets with reliability protocol
+            if reliability == "SAW":
+               sent_packet = stop_wait()
+            elif reliability == "GBN":
+               sent_packet = gbn() # Send packet using Go-Back-N protocol
+            elif reliability == "SR":
+               sent_packet = sr() # Send packet using Selective Repeat protocol
 
-    # Sends "END" when file transfer is done
-    client_socket.sendto("END".encode(), serverAddress)
-    print("Sent file index.html to " + str(serverAddress))
-
-    return 0
-
-
-def make_packet(seq_num, data):
-    # Make a packet with the sequence number and data
-    return struct.pack("I1024s", seq_num, data)
-
-
-def extract_seq_num(packet):
-    # Extract the sequence number from the packet received
-    return struct.unpack("I", packet[:4])[0]
-
-
-# Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
-# If no ack received, it waits for timeout, and tries to send the packet again.
-def stop_wait(filename, socket):
-    # Open the file to be transferred
-    try:
-        file = open(filename, "rb")
-    except FileNotFoundError:
-        print("Error: Could not open file.")
-        return
-
-    # Read the file data in chunks and send it to the server
-    seq_num = 0
-    while True:
-        data = file.read(1024)
-        if not data:
-            break
-        packet = make_packet(seq_num, data)
-
-        # Send packet and wait for ACK
+    # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
+    # If no ack received, it waits for timeout, and tries to send the packet again.
+    def stop_wait():
+        # Read the file data in chunks and send it to the server
+        seq_num = 0
         while True:
-            try:
-                # Send packet to receiver
-                socket.sendto(packet)
-                print(f"Sent packet with sequence number: {seq_num}")
+            data = file.read(1024)
+            if not data:
+                break
+            packet = create_packet(seq_num, ack, flags, win, data)
 
-                # Wait for ACK
-                socket.settimeout(1)  # Waits for ack from server
-                ack_packet = socket.recvform(1024)
-                ack_seq_num = extract_seq_num(ack_packet)
+            # Send packet and wait for ACK
+            while True:
+                try:
+                    # Send packet to receiver
+                    socket.sendto(packet)
+                    print(f"Sent packet with sequence number: {seq_num}")
 
-                # Check if received ACK is for the expected sequence number
-                if ack_seq_num == seq_num:
-                    print(f"Received ACK for packet with sequence number: {seq_num}")
-                    break
+                    # Wait for ACK
+                    socket.settimeout(0.5)  # Waits for ack from server
+                    ack_packet = socket.recvform(1024)
+                    ack_seq_num = extract_seq_num(ack_packet)
 
-            except socket.timeout:
-                print(f"Timeout for packet with sequence number: {seq_num}, resending")
-                # Timeout occurred, re-send packet
-                continue
+                    # Check if received ACK is for the expected sequence number
+                    if ack_seq_num == seq_num:
+                        print(f"Received ACK for packet with sequence number: {seq_num}")
+                        break
 
-                # Move to next sequence number
-                seq_num += 1
+                except socket.timeout:
+                    print(f"Timeout for packet with sequence number: {seq_num}, resending")
+                    # Timeout occurred, re-send packet
+                    continue
 
-    file.close()
-    print("Transfer complete.")
+                    # Move to next sequence number
+                    seq_num += 1
+
+
+
+        file.close()
+        print("Transfer complete.")
+
+
+
+
+
 
 
 # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
@@ -299,7 +318,8 @@ def gbn(filename, socket):
             print("Transfer complete.")
             break
 
-
+#SR: Du får ack etter hver eneste pakke.
+# sends ack for each packet sent
 def sr(filename, socket):
     socket.settimeout(1)  # Set timeout to 1s
     WINDOW_SIZE = 5  # Set window size to 5 packets
@@ -407,8 +427,7 @@ def checkTestCase(val):
     else:
         raise Exception("Could not parse -t testcase input. Expected: \"SKIP_ACK\" or \"LOSS\", Actual: " + str(val))
 
-parser = argparse.ArgumentParser(description="positional arguments",
-                                 epilog="end of help")  # Initialises argsparse parser
+parser = argparse.ArgumentParser(description="positional arguments", epilog="end of help")  # Initialises argsparse parser
 
 # Arguments
 parser.add_argument('-s', '--server', action='store_true', default=False, help="Start in server mode. Default.")
