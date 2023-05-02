@@ -34,6 +34,28 @@ def server(ip, port, reliability, testcase):
 
     print("Server is up and listening on " + str(ip) + ":" + str(port))
 
+    # Wait for a SYN packet from the client
+    data, client_address = server_socket.recvfrom(1460)
+    seq, ack, flags, win = parse_header(data)
+    if flags == 2:  # If SYN packet received
+        print("Received SYN from client")
+
+    # Send SYN-ACK packet to client
+    sequence_number = 1
+    acknowledgment_number = seq + 1
+    flags = 12  # SYN-ACK flags
+    window = 0
+    data = "SYN-ACK".encode()
+    packet = create_packet(sequence_number, acknowledgment_number, flags, window, data)
+    server_socket.sendto(packet, client_address)
+    print("Sent SYN-ACK to client")
+
+    data, client_address = server_socket.recvfrom(1460)
+    seq, ack, flags, win = parse_header(data[:12])
+    if flags == 4:
+            print("ACK has been received, connection established.")
+
+
     # While-loop that covers all the functionality of the server
     # The requests it can handle are:
     # PING: Respond to ping from client
@@ -45,6 +67,9 @@ def server(ip, port, reliability, testcase):
 
 
     while True:
+        '''
+        '''
+        # ---------- Kanskje vi kan kommentere ut fra her! ----------------
         data, client_address = server_socket.recvfrom(1024)
         print("DATA")
         print(data)
@@ -57,6 +82,8 @@ def server(ip, port, reliability, testcase):
             flags = 4  # "ACK" flag 0 1 0 0
             packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
             server_socket.sendto(packet, client_address)
+
+        # ----------------- Til her ettersom SYN-ACK ordner dette? -------------------
         elif "FILE" in msg:
             print("preparing to receive file from client " + str(client_address))
             # Storing indexes in a set as these are more efficient for this use case
@@ -176,6 +203,8 @@ def client(ip, port, filename, reliability, testcase):
         # Receive response and parse header
         response, null = client_socket.recvfrom(1024)
         seq, ack, flags, win = parse_header(response)
+
+
 
         if flags == 4: #If flags == ACK
             timeout = time.time() - startTime
