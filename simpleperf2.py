@@ -207,7 +207,27 @@ def client(ip, port, filename, reliability, testcase):
 
 
         if flags == 4: #If flags == ACK
-            timeout = time.time() - startTime
+            # timeout = time.time() - startTime
+            timeoutDuration = 0.5
+
+            timeout = client_socket.settimeout(timeoutDuration) # Set timeout for the client
+
+            # test packet
+            packet = 'Hello world!'.encode()
+            client_socket.sendto(packet, ('127.0.0.1', 8088))
+
+            # wait for the response and calculates the RTT
+
+            try:
+                start_time = time.time()
+                response, address = client_socket.recvfrom(1024)
+                end_Time = time.time()
+                rtt_time = end_Time - start_time # calculates the RTT time
+                print('Response received: ', response.decode())
+                print('RTT: ', rtt_time) # prints the the calculated RTT
+            except client_socket.timeout:
+                # prints out a message if it isn't able to calculate the RTT
+                print('Timeout occured.')
 
             # Setting timeout. If RTT is lower than 10ms, timeout is set to a safe low value of 50ms
             # Otherwise, it's set to 4*RTT
