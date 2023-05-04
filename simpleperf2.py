@@ -495,9 +495,9 @@ def client(ip, port, filename, reliability, testcase):
         if reliability == "SAW":
             stop_wait()
         elif reliability == "GBN":
-            gbn()  # Send packet using Go-Back-N protocol
+            gbn(filename, client_socket)  # Send packet using Go-Back-N protocol
         elif reliability == "SR":
-            sr()  # Send packet using Selective Repeat protocol
+            sr(filename, client_socket)  # Send packet using Selective Repeat protocol
 
         # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
         # If no ack received, it waits for timeout, and tries to send the packet again.
@@ -720,7 +720,7 @@ def checkPort(val):  # Checks input of -p port flag
 
 def checkReliability(val):
     val = val.upper()
-    if val == None:
+    if val is None:
         return None
     elif val == "SAW" or val == "STOP_AND_WAIT":
         return "SAW"
@@ -736,7 +736,7 @@ def checkReliability(val):
 
 def checkTestCase(val):
     val = val.upper()
-    if val == None:
+    if val is None:
         return None
     elif val == "SKIP_ACK" or val == "SKIPACK":
         return "SKIP_ACK"
