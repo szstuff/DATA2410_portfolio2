@@ -262,13 +262,17 @@ def client(ip, port, filename, reliability, testcase):
         print("Final ACK has been sent to server")
 
         try:
-            # Wait for response to print
-            response, serverAddress = client_socket.recvfrom(1472)
-            print("Final response received from server: ", response.decode())
+            # Wait for final response to print
+            final_response, serverAddress = client_socket.recvfrom(1472)
+            print("Final response received from server: ", final_response.decode())
         except client_socket.timeout:
             print("Timeout occurred while waiting for final response from server")
+            client_socket.close()
+            return
     else:
         print("Error: Expected SYN ACK from server but received unexpected packet")
+        client_socket.close()
+        return
 
         # -------------- slutten på ny kode knyttet til Three-way handshake -------------------
         ## FEIL MATTE PÅ TIMEOUT, jeg har gjort noe men vet ikke om det er riktig
