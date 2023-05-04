@@ -57,11 +57,24 @@ def server(ip, port, reliability, testcase):
             print("ACK has been received, connection established.")
 
     #Preparing for file transfer
-    sequence_number = 0
-    acknowledgment_number = 0
-    window = 0
-    received_data = [None] * 10
-    file_name=""
+    filename = ""
+    no_of_packets = 0
+    expectedFilesize = 0
+    received_data = []
+    while True:
+        try:
+            metadata, client_address = server_socket.recvfrom(1472)
+            filename, no_of_packets, expectedFilesize = unpack_metadata(metadata)
+            sequence_number = 0
+            acknowledgment_number = 0
+            window = 0
+            received_data = [None] * no_of_packets
+
+            response = create_packet(-1, -1, 4, window, "".encode())
+            server_socket.sendto(response, client_address)
+            print("SENT ACK FOR METADATA")
+        except Exception as e:
+            print("Exception when receiving metadata")
     '''
     parse metadata (file name, size, etc) sent from client
     packet, client_address = server_socket.recvfrom(1472)
@@ -71,22 +84,29 @@ def server(ip, port, reliability, testcase):
         '''
     def stop_wait():
         print("I stop_wait")
-        while True:
-            print("I while true")
+        for i in len(no_of_packets):
+            print("I for " + str(i) + " in len(no_of_packets) " + str(no_of_packets))
             try:
                 print("I try")
                 packet, client_address = server_socket.recvfrom(1472)
                 print("Mottatt PACKET")
                 print(packet)
                 seq, ack, flags, win = parse_header(packet)
-                data = data[12:]
-                print("DATA")
-                print(data)
+                data = packet[12:]
+                print("PACKET12:, FLAGS")
+                print(packet[:12])
+                print(flags)
                 if flags == 0:
                     print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
                     received_data[seq] = data
+                    response = create_packet(seq, seq, 4, window, "".encode())
+                    server_socket.sendto(response, client_address)
             except Exception as e:
                 print(f"Exception ocurred: {e}")
+    with open((filename + "_recieved.txt"), "w") as output_file:
+        for packet in recieved_data:
+            output_file.write("".join(packet))
+
 
     if reliability == "SAW":
         stop_wait()
@@ -310,10 +330,26 @@ def client(ip, port, filename, reliability, testcase):
         print("File size: " + str(file_size) + ", no of packets: " + str(no_of_packets)) # Print size of the file and number of packets requiered to send  the file
         print("No of packets: " + str(len(split_file))) # Print number of packets the file was split into
 
+        while True:
+            try:
+                metadata = pack_metadata(filename, no_of_packets, file_size)
+                packet = create_packet(-1, 0, 0, window, metadata)
+                client_socket.sendto(packet, serverAddress)
+
+                response, null = client_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(response)
+                if flags == 4 and ack == -1:
+                    print("ACK received for metadata")
+                    break
+            except Exception as e:
+                print("Exception when sending metadata")
+
         def stop_wait():
+            client_socket.settimeout(1)
             print("stopwait")
             offset = sequence_number #Sequence_number is not 0 because of previous messages.
             #Sequence_number is used as an offset for i to send the correct seq to server
+
             for i, packet_data in enumerate(split_file):
                 print(f"Sending packet {i} of {no_of_packets}", end="\r") # Print a progress message of which package is being sent
                 #packet = create_packet(i+offset, ack, flags, win, packet_data)
@@ -330,6 +366,8 @@ def client(ip, port, filename, reliability, testcase):
 
                         # Receive for ACK
                         response, null = client_socket.recvfrom(1472)
+                        print("RESPONSE")
+                        print(response)
                         seq, ack, flags, win = parse_header(response)
                         # Check if received ACK is for the expected sequence number
                         #if flags == 4 and ack == i+offset: #If flags = ACK and ack is equal to seq
@@ -455,7 +493,7 @@ def client(ip, port, filename, reliability, testcase):
                                print(f"Packet with dequence number {sequence_number} is re-sent")
                                retries[sequence_number] += 1
                                # retries += 1
-                        break
+                               break
 
 
 #sends ack for each packet sent
@@ -580,6 +618,18 @@ def client(ip, port, filename, reliability, testcase):
         print("Error closing connection from client")
     # ----- slutten på two way handshake -------
 '''
+
+#Packs file metadata. Used in client to tell server how to name the file and how big it is
+def pack_metadata(filename, no_of_packets, filesize):
+    return (str(filename) + ":" + str(no_of_packets) + ":" + str(filesize)).encode()
+#Unpacks metadata. Used by server to check for errors (comparing expected and actual filesize), name file and how many packets to expect
+def unpack_metadata(metadata):
+    metadata = metadata.decode()
+    array = metadata.split(":")
+    filename = array[0]
+    no_of_packets = array[1]
+    filesize = array[2]
+    return filename, no_of_packets, filesize
 
 # Check-metoder
 ###
