@@ -101,11 +101,11 @@ def server(ip, port, reliability, testcase):
     while True:
         '''
         # ---------- Kanskje vi kan kommentere ut fra her! ----------------
-        data, client_address = server_socket.recvfrom(1024)
+        data, client_address = server_socket.recvfrom(1472)
         print("DATA")
         print(data)
         header = data[:12]  # Extract header from message
-        data = data [12:]
+        data = data[12:]
         seq, ack, flags, win = parse_header(header)
         # if "PING" in msg:
         #     print(f"Received PING from client", end="\r")
@@ -125,7 +125,7 @@ def server(ip, port, reliability, testcase):
             lastIndex = -1
             while True:
                 # Server first receives the index
-                data, addr = server_socket.recvfrom(1024)
+                data, addr = server_socket.recvfrom(1472)
                 header = data[:12] # Extract header from message
                 seq, ack, flags, win = parse_header(data)
                 # If index is "END", the client is done transferring the file
@@ -150,14 +150,14 @@ def server(ip, port, reliability, testcase):
                 f.write(file)
             print(filename + " saved to working directory.")
 
-        filename = server_socket.recvfrom(1024)  # Receive data from client
+        filename = server_socket.recvfrom(1472)  # Receive data from client
 
 
         ##### Kommentert ut ettersom dette ikke brukes av programmet (foreløpig?).
         # Open the file , evt use wb to ensure that the data is sent as bytes
         # with open(filename) as f:
         #     while True:
-        #         data, serverAddress = server_socket.recvfrom(1024)
+        #         data, serverAddress = server_socket.recvfrom(1472)
         #         if not data:
         #             break
         #         f.write(data)  # Write the received data to the file
@@ -218,8 +218,6 @@ def client(ip, port, filename, reliability, testcase):
         print("Error: Expected SYN ACK from server but received unexpected packet")
 
         # -------------- slutten på ny kode knyttet til Three-way handshake -------------------
-
-
         ## FEIL MATTE PÅ TIMEOUT, jeg har gjort noe men vet ikke om det er riktig
         # Create PING packet
         #DEPRECATED
@@ -231,7 +229,7 @@ def client(ip, port, filename, reliability, testcase):
         sequence_number += 1
 
         # Receive response and parse header
-        response, null = client_socket.recvfrom(1024)
+        response, null = client_socket.recvfrom(1472)
         seq, ack, flags, win = parse_header(response)
 
 
@@ -250,7 +248,7 @@ def client(ip, port, filename, reliability, testcase):
 
             try:
                 start_time = time.time()
-                response, address = client_socket.recvfrom(1024)
+                response, address = client_socket.recvfrom(1472)
                 end_Time = time.time()
                 rtt_time = end_Time - start_time # calculates the RTT time
                 print('Response received: ', response.decode())
@@ -568,7 +566,7 @@ def client(ip, port, filename, reliability, testcase):
 
 def checkFile(filename):  # Checks if the file exists in the server's system
     if os.path.isfile(filename):
-        return True
+        return filename
     else:
         return False
 
@@ -632,7 +630,7 @@ args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
     print("starting server")
-    server(args.ip, args.port, None, None)
+    server(args.ip, args.port, args.reliable, None)
 elif args.client:
     print("client starting")
     client(args.ip, args.port, args.reliability, None, None)
