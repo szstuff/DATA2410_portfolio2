@@ -38,7 +38,7 @@ def server(ip, port, reliability, testcase):
     # Wait for a SYN packet from the client
     data, client_address = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
-    if flags == 2:  # If SYN packet received
+    if flags == 8:  # If SYN packet received
         print("Received SYN from client")
 
     # Send SYN-ACK packet to client
@@ -99,6 +99,25 @@ def server(ip, port, reliability, testcase):
 
     #close server
     while True:
+        # ----------- two way handshake ---------------
+        # Receive response and parse header from client
+        data, null = server_socket.recvfrom(1472)
+        seq, ack, flags, win = parse_header(data)
+
+        if flags == 2:  # If FIN packet received
+            print("Received FIN from client ")
+
+            # Sends a ACK for the FIN
+            data = "ACK".encode()
+            packet = create_packet(sequence_number, acknowledgment_number, flags, window, data)
+            server_socket.sendto(packet, client_address)
+
+            print("ACK has been sent to server, connection is closing")
+            server_socket.close()
+        else:
+            print("Error closing connection from server")
+        # ------- slutten på two way handshake -----------
+
         '''
         # ---------- Kanskje vi kan kommentere ut fra her! ----------------
         data, client_address = server_socket.recvfrom(1472)
@@ -241,8 +260,10 @@ def client(ip, port, filename, reliability, testcase):
             timeout = client_socket.settimeout(timeoutDuration) # Set timeout for the client
 
             # test packet
-            packet = 'Hello world!'.encode()
-            client_socket.sendto(packet, ('127.0.0.1', 8088))
+            
+        
+              packet = 'Hello world!'.encode()
+              client_socket.sendto(packet, ('127.0.0.1', 8097))
 
             # wait for the response and calculates the RTT
 
@@ -633,6 +654,6 @@ if args.server:
     server(args.ip, args.port, args.reliable, None)
 elif args.client:
     print("client starting")
-    client(args.ip, args.port, args.reliability, None, None)
+    client(args.ip, args.port, args.file, args.reliable, None)
 else:
     print("Could not start")
