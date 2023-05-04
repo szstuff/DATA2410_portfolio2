@@ -62,19 +62,22 @@ def server(ip, port, reliability, testcase):
     expectedFilesize = 0
     received_data = []
     while True:
-        try:
-            metadata, client_address = server_socket.recvfrom(1472)
-            filename, no_of_packets, expectedFilesize = unpack_metadata(metadata)
-            sequence_number = 0
-            acknowledgment_number = 0
-            window = 0
-            received_data = [None] * no_of_packets
+        #try:
+        metadata, client_address = server_socket.recvfrom(1472)
+        filename, no_of_packets, expectedFilesize = unpack_metadata(metadata)
+        no_of_packets = int(no_of_packets)
+        expectedFilesize = int(expectedFilesize)
+        sequence_number = 0
+        acknowledgment_number = 0
+        window = 0
+        received_data = [None] * no_of_packets
 
-            response = create_packet(-1, -1, 4, window, "".encode())
-            server_socket.sendto(response, client_address)
-            print("SENT ACK FOR METADATA")
-        except Exception as e:
-            print("Exception when receiving metadata")
+        response = create_packet(0, 0, 4, window, "".encode())
+        server_socket.sendto(response, client_address)
+        print("SENT ACK FOR METADATA")
+        break
+        #except Exception as e:
+         #   print("Exception when receiving metadata" + str(e))
     '''
     parse metadata (file name, size, etc) sent from client
     packet, client_address = server_socket.recvfrom(1472)
@@ -84,8 +87,8 @@ def server(ip, port, reliability, testcase):
         '''
     def stop_wait():
         print("I stop_wait")
-        for i in len(no_of_packets):
-            print("I for " + str(i) + " in len(no_of_packets) " + str(no_of_packets))
+        for i in range(no_of_packets):
+            print("I for " + str(i) + " in no_of_packets: " + str(no_of_packets))
             try:
                 print("I try")
                 packet, client_address = server_socket.recvfrom(1472)
@@ -103,10 +106,6 @@ def server(ip, port, reliability, testcase):
                     server_socket.sendto(response, client_address)
             except Exception as e:
                 print(f"Exception ocurred: {e}")
-    with open((filename + "_recieved.txt"), "w") as output_file:
-        for packet in recieved_data:
-            output_file.write("".join(packet))
-
 
     if reliability == "SAW":
         stop_wait()
@@ -116,6 +115,15 @@ def server(ip, port, reliability, testcase):
         sr()
     print(received_data)
 
+    finalFile = ""
+    for i, arrayItem in enumerate(received_data):
+        print("ARRAYITEM")
+        print(arrayItem)
+        finalFile += arrayItem.decode()
+
+    f = open(("_recieved.txt"), "w")
+    f.write(finalFile)
+    f.close()
 
     #close server
     while True:
@@ -330,22 +338,30 @@ def client(ip, port, filename, reliability, testcase):
         print("File size: " + str(file_size) + ", no of packets: " + str(no_of_packets)) # Print size of the file and number of packets requiered to send  the file
         print("No of packets: " + str(len(split_file))) # Print number of packets the file was split into
 
+
+        client_socket.settimeout(1)
+
         while True:
             try:
+                print("1")
                 metadata = pack_metadata(filename, no_of_packets, file_size)
-                packet = create_packet(-1, 0, 0, window, metadata)
+                print("2")
+                packet = create_packet(0, 0, 0, window, metadata)
+                print("3")
                 client_socket.sendto(packet, serverAddress)
+                print("4")
 
                 response, null = client_socket.recvfrom(1472)
+                print("5")
                 seq, ack, flags, win = parse_header(response)
-                if flags == 4 and ack == -1:
+                print("6")
+                if flags == 4 and ack == 0:
                     print("ACK received for metadata")
                     break
             except Exception as e:
-                print("Exception when sending metadata")
+                print("Exception when sending metadata: " + str(e))
 
         def stop_wait():
-            client_socket.settimeout(1)
             print("stopwait")
             offset = sequence_number #Sequence_number is not 0 because of previous messages.
             #Sequence_number is used as an offset for i to send the correct seq to server
