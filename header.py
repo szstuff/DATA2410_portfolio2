@@ -32,12 +32,16 @@ def create_packet(seq, ack, flags, win, data):
     return packet
 
 
-def parse_header(header):
+def parse_header(message):
     #taks a header of 12 bytes as an argument,
     #unpacks the value based on the specified header_format
     #and return a tuple with the values
-    header_from_msg = unpack(header_format, header)
+    message = message[:12]
+    print("HEADER:")
+    print(message)
+    header_from_msg = unpack(header_format, message)
     #parse_flags(flags)
+    print(header_from_msg)
     return header_from_msg
 
 
