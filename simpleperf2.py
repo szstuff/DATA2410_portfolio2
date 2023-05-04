@@ -581,7 +581,6 @@ def client(ip, port, filename, reliability, testcase):
     # ----- slutten på two way handshake -------
 '''
 
-###
 # Check-metoder
 ###
 
