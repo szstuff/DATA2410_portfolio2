@@ -494,7 +494,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
             received_packets = {}  # Dictionary to save received packets and their sequence numbers
 
             while True:
-                # Reads a chunk of data from the fil
+                # Reads a chunk of data from the file
                 data = file.read(1460)
                 if not data:
                     break  # No more data, break loop
@@ -547,6 +547,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
 '''
     # ------- two way handshake ---------
+    # ends the connection with a two-way handshake
     # Create FIN packet and sends to server
     data = "FIN"
     packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
@@ -566,7 +567,13 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
     else:
         print("Error closing connection from client")
+        
+    endTime = time.time()
+    rtt = endTime - startTime
+    print('RTT of three-way handshake: ', rtt)
     # ----- slutten på two way handshake -------
+    
+    
 '''
 # Packs file metadata. Used in client to tell server how to name the file and how big it is
 def pack_metadata(filename, no_of_packets, filesize):
