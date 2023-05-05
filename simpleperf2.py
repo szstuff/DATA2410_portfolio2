@@ -145,6 +145,122 @@ def server(ip, port, reliability, testcase, window_size):
                     server_socket.sendto(response, client_address)
             except Exception as e:
                 print(f"Exception ocurred: {e}")
+    def sr():
+        with open(filename, "rb") as f:
+            expSeqNo = 0 # Expected seq number in order to keep track
+
+            while True:
+                # Receive packet from sender
+                packet, address = socket.recvfrom(1472)
+
+                # Extract packet header
+                seq, ack, flags, win = parse_header(packet)
+
+                # Check if packet is the expected one
+                if seq == expSeqNo:
+                    data = packet[12:]
+                    print(f" {data}, \nReceived the expected packet")
+
+                    # Sends ACK packet to receiver
+                    ackPakcet = create_packet(seq, seq, 4, window, "".encode())
+                    server_socket.sendto(ackPakcet, client_address)
+
+                    # Update the expected sequence number and the received packets
+                    expSeqNo += 1
+                    received_data[seq] = packet
+
+                    # Checks if there is any buffered packets that can be added to file
+                    while expSeqNo in received_data:
+                        data = received_data[expSeqNo][12:]
+                        print(f' {data}, \nchecking data')
+
+                        # Remove packet from received dictionary
+                        del received_data[expSeqNo]
+
+                        # Update expected sequence number
+                        expSeqNo += 1
+                else:
+                    # Packet has been sent out of order, sends a new ACK for previous packet
+                    ackPakcet = create_packet(seq, expSeqNo, 4, window, "".encode())
+                    server_socket.sendto(ackPakcet, client_address)
+    if reliability == "SAW":
+        stop_wait()
+    elif reliability == "GBN":
+        gbn(filename)
+    elif reliability == "SR":
+        sr()
+    print(received_data)
+
+    finalFile = ""
+    for i, arrayItem in enumerate(received_data):
+        print("ARRAYITEM")
+        print(arrayItem)
+        finalFile += arrayItem.decode()
+
+    f = open(("_recieved.txt"), "w")
+    f.write(finalFile)
+    f.close()
+
+    # close server
+    while True:
+        # A two-way handshake to close the connection
+        # sends an ACK to acknowledge the SYN ACK from the client
+        # ----------- two way handshake ---------------
+        # Receive response and parse header from client
+        data, null = server_socket.recvfrom(1472)
+        seq, ack, flags, win = parse_header(data)
+
+        if flags == 2:  # If FIN packet received
+            print("Received FIN from client ")
+
+            # Sends a ACK for the FIN
+            data = "ACK".encode()
+            packet = create_packet(sequence_number, acknowledgment_number, flags, window, data)
+            server_socket.sendto(packet, client_address)
+
+            print("ACK has been sent to server, connection is closing")
+            server_socket.close()
+        else:
+            print("Error closing connection from server")
+        # ------- slutten på two way handshake -----------
+
+
+
+'''
+    def sr_gbn(filename):
+        server_socket.settimeout(0.5)
+        nextExpected_seq = 0
+        packetSize = 1472
+        buffer = {}
+
+        # receive packets
+        while True:
+            # Receives packet and parse header
+            packet, addr = server_socket.recvfrom(packetSize)
+            seqNum, flags = struct.unpack("!HH", packet[:4])
+            data = packet[4:]
+
+            # If packet is in order, store it in receive buffer and send cumulative ACK
+            if seqNum == nextExpected_seq:
+                buffer[seq_num] = data
+                nextExpected_seq += 1
+                while nextExpected_seq in buffer:
+                    data = buffer.pop(nextExpected_seq)
+                    nextExpected_seq += 1
+                ackPacket = struct.pack("!HH", nextExpected_seq - 1, 1)
+                server_socket.sendto(ackPacket, addr)
+
+            # If packet is out of order, store it in receive buffer and send ACK
+            elif seqNum > nextExpected_seq:
+                buffer[seqNum] = data
+                ackPacket = struct.pack("!HH", nextExpected_seq - 1, 1)
+                server_socket.sendto(ackPacket, addr)
+
+            # If packet have already been received, send duplicate ACK
+            else:
+                ackPacket = struct.pack("!HH", seqNum, 1)
+                server_socket.sendto(ackPacket, addr)
+'''
 
 
 
@@ -327,20 +443,18 @@ def client(ip, port, filename, reliability, testcase, window_size):
         # SR: Du får ack etter hver eneste pakke.
 
         # -------- koder ny def sr -----------
-        def srny(filename, socket):
-            windowSize = 3  # Sets the window size to 3 packets in total
-
+        def sr(filename, socket):
             # Variables
-            expSeqNum = 0
+            windowSize = 3  # Sets the window size to 3 packets in total
+            SeqNum = 0
             packets = []  # Create array list for packets
-            received_packets = {}  # Dictionary to save received packets and their sequence numbers
-            # retries = {}  # Dictionary to save the number of retries for each unacknowledged packet
+            sent_packets = {}  # Dictionary to save received packets and their sequence numbers
             retries = 0
 
-            while expSeqNum <= len(packets):
+            while SeqNum <= len(packets):
                 # Sends current window of packets
-                windowStart = expSeqNum - windowSize
-                windowEnd = min(expSeqNum, len(packets))
+                windowStart = SeqNum - windowSize
+                windowEnd = min(SeqNum, len(packets))
 
                 for i in range(windowStart, windowEnd):
                     socket.sendto(packets[i], serverAddress)
@@ -350,11 +464,11 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 while True:
                     # while retries <= 3
                     try:
-                        ackPacket, serverAddress = socket.recvfrom(1472)  # Receive ASK packet from receiver
+                        ackPacket, serverAddress = socket.recvfrom(1472)  # Receive ACK packet from receiver
                         ackSeqNo = extractSeqNo(ackPacket)
 
                         # Only accept ACK for packets in current window
-                        if ackSeqNo >= expSeqNum - windowSize and ackSeqNo < expSeqNum:
+                        if ackSeqNo >= SeqNum - windowSize and ackSeqNo < SeqNum:
                             if ackSeqNo not in received_packets:  # Checks if ACK packet has not been received
                                 received_packets[ackSeqNo] = True  # Mark ACK as recived
                                 if ackSeqNo in retries:  # Remove packet from retries if it has been acknowledged
@@ -363,7 +477,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         for sequence_number in retries:
                             if retries < 3:
                                 socket.sendto(packets[sequence_number], serverAddress)
-                                print(f"Packet with dequence number {sequence_number} is re-sent")
+                                print(f"Packet with sequence number {sequence_number} is re-sent")
                                 retries[sequence_number] += 1
                                 # retries += 1
                                 break
@@ -424,6 +538,12 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
             print('Transfer complete.')
 
+        if reliability == "SAW":
+            stop_wait()
+        elif reliability == "GBN":
+            gbn(filename, client_socket)  # Send packet using Go-Back-N protocol
+        elif reliability == "SR":
+            sr(filename, client_socket)  # Send packet using Selective Repeat protocol
 
 '''
     # ------- two way handshake ---------
