@@ -1,5 +1,4 @@
 from typing import Any
-
 import header
 import random
 import socket
@@ -14,46 +13,56 @@ import os
 from header import *
 import math
 
+#Main server function, initialises the server with specified parameters
+def server(ip, port, reliability, testcase, window_size):
+    #ip and port: Which IP-address and port the server should listen to
+    #reliability: What reliability protocol should be used for the connection
+    #testcase: XXXXX ????
 
-def server(ip, port, reliability, testcase):
-    # creating the socket
-    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+    server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)     # creating the socket
     # This code runs through ports until it finds an open one
-    noport = True  # Used for while loop. Set to false when the server successfully binds to a port
-    firstPort = port  # Used to quit the program when server can't bind to a provided IP and every port from 1024-65534.
-    while noport:  # Loops through all ports for the given IP and binds to the first available one.
-        try:  # Used to handle exceptions when server can't bind to a port without quitting the program.
+    firstPort = port            # Used to quit the program when server can't bind to a provided IP and every port from 1024-65534.
+    while True:                 # Loops through all ports for the given IP and binds to the first available one.
+        try:                    # Used to handle exceptions when server can't bind to a port without quitting the program.
             server_socket.bind((ip, port))  # Attempts to bind with provided IP and current port
-            noport = False
-        except OSError:  # Excepts error when server cant bind to provided IP and port
+            break               # Break out of loop if bind didn't raise an exception
+        except OSError:         # Catches exceptions when binding
             port = port + 1  # Iterates port for the next bind attempt
         if port == 65535:
             port = 1024  # Used to run through remaining ports in the valid range.
         elif (port == firstPort - 1):  # If the current port is the one prior to the first port, an error message
-            # is shown. It's worth noting that the last port is never actually tested.
+            # is shown. It's worth noting that the last port can't be tested because of this
             raise Exception("Could not bind to any port on IP " + str(ip))
 
     print("Server is up and listening on " + str(ip) + ":" + str(port))
 
-    # Wait for a SYN packet from the client
+    #######
+    # Threeway handshake for initialising connection
+    #######
+    # 1. Receive and parse SYN from client
     data, client_address = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
-    if flags == 8:  # If SYN packet received
-        print("Received SYN from client")
+    if not flags == 8:  # If packet is not a SYN packet
+        print(str(flags))
+        raise Exception("Expected SYN (8) packet. Received: " + str(flags))
 
-    # Send SYN-ACK packet to client
-    sequence_number = 1
-    acknowledgment_number = seq + 1
+    # 2. Send SYN-ACK packet to client
+    sequence_number = 0
+    acknowledgment_number = seq     #Server acknowledges that packet with sequence_nr is received
     flags = 12  # SYN-ACK flags
     window = 0
-    data = "SYN-ACK".encode()
-    packet = create_packet(sequence_number, acknowledgment_number, flags, window, data)
+    packet = create_packet(sequence_number, acknowledgment_number, flags, window, "".encode())
     server_socket.sendto(packet, client_address)
     print("Sent SYN-ACK to client")
 
-    data, client_address = server_socket.recvfrom(1460)
-    seq, ack, flags, win = parse_header(data[:12])
-    if flags == 4:
+    # 3. Receive final ACK from client
+    data, client_address = server_socket.recvfrom(1472)
+    seq, ack, flags, win = parse_header(data)
+
+    if not flags == 4:
+        print(str(flags))
+        raise Exception("Expected SYN (8) packet. Received: " + str(flags))
+    else:
         print("ACK has been received, connection established.")
 
     # Preparing for file transfer
@@ -61,6 +70,10 @@ def server(ip, port, reliability, testcase):
     no_of_packets = 0
     expectedFilesize = 0
     received_data = []
+
+    ########
+    # Receive metadata from client
+    ########
     while True:
         # try:
         metadata, client_address = server_socket.recvfrom(1472)
@@ -71,6 +84,7 @@ def server(ip, port, reliability, testcase):
         acknowledgment_number = 0
         window = 0
         received_data = [None] * no_of_packets
+        print("Received_data length: " +str(len(received_data)))
 
         response = create_packet(0, 0, 4, window, "".encode())
         server_socket.sendto(response, client_address)
@@ -78,20 +92,45 @@ def server(ip, port, reliability, testcase):
         break
         # except Exception as e:
         #   print("Exception when receiving metadata" + str(e))
-    '''
-    parse metadata (file name, size, etc) sent from client
-    packet, client_address = server_socket.recvfrom(1472)
-    seq, ack, flags, win = parse_header(packet)
-    data = data[12:]
-    if flags == 0:
-        '''
+
+    def gbn(filename):
+        server_socket.settimeout(0.5)
+        expected_seq = 0
+
+        while True:
+            # Wait for ACK
+            for i in range(window_size):
+                try:
+                    packet, client_address = server_socket.recvfrom(1472)
+                    seq, ack, flags, win = parse_header(packet)
+                    data = packet[12:]
+
+                    if flags == 0:
+                        if received_data[seq] is None:
+                            received_data[seq] = data
+                            response = create_packet(0, seq, 4, window_size, "".encode())
+                            server_socket.sendto(response, client_address)
+                            print(f"Sent ACK {seq}")
+
+                        # If expected_seq packet was received
+                        if seq == expected_seq:
+                            while received_data[expected_seq] is not None:
+                                expected_seq += 1
+                except socket.timeout:
+                    print("Socket timeout")
+
+                    # Resend packets in current window
+                    for packet in range(no_of_packets):
+                        seq, ack, flags, win = parse_header(packet)
+                        if received_data[seq] is None:
+                            server_socket.sendto(packet, client_address)
+                            print(f"Resent packet {seq}")
+                    break
 
     def stop_wait():
-        print("I stop_wait")
         for i in range(no_of_packets):
             print("I for " + str(i) + " in no_of_packets: " + str(no_of_packets))
             try:
-                print("I try")
                 packet, client_address = server_socket.recvfrom(1472)
                 print("Mottatt PACKET")
                 print(packet)
@@ -108,265 +147,63 @@ def server(ip, port, reliability, testcase):
             except Exception as e:
                 print(f"Exception ocurred: {e}")
 
-    if reliability == "SAW":
-        stop_wait()
-    elif reliability == "GBN":
-        gbn()
-    elif reliability == "SR":
-        sr()
-    print(received_data)
-
-    finalFile = ""
-    for i, arrayItem in enumerate(received_data):
-        print("ARRAYITEM")
-        print(arrayItem)
-        finalFile += arrayItem.decode()
-
-    f = open(("_recieved.txt"), "w")
-    f.write(finalFile)
-    f.close()
-
-    # close server
-    while True:
-        # ----------- two way handshake ---------------
-        # Receive response and parse header from client
-        data, null = server_socket.recvfrom(1472)
-        seq, ack, flags, win = parse_header(data)
-
-        if flags == 2:  # If FIN packet received
-            print("Received FIN from client ")
-
-            # Sends a ACK for the FIN
-            data = "ACK".encode()
-            packet = create_packet(sequence_number, acknowledgment_number, flags, window, data)
-            server_socket.sendto(packet, client_address)
-
-            print("ACK has been sent to server, connection is closing")
-            server_socket.close()
-        else:
-            print("Error closing connection from server")
-        # ------- slutten på two way handshake -----------
-
-        '''
-        # ---------- Kanskje vi kan kommentere ut fra her! ----------------
-        data, client_address = server_socket.recvfrom(1472)
-        print("DATA")
-        print(data)
-        header = data[:12]  # Extract header from message
-        data = data[12:]
-        seq, ack, flags, win = parse_header(header)
-        # if "PING" in msg:
-        #     print(f"Received PING from client", end="\r")
-        #     data = "ACK:PING"
-        #     flags = 4  # "ACK" flag 0 1 0 0
-        #     packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
-        #     server_socket.sendto(packet, client_address)
-
-        # ----------------- Til her ettersom SYN-ACK ordner dette? -------------------
-        if "FILE" in data:
-            print("preparing to receive file from client " + str(client_address))
-            # Storing indexes in a set as these are more efficient for this use case
-            ##Mangler kode for å motta filnavn
-            filename = ""
-            ########
-            # Last index that was received from client. Starts at -1 as the first index is supposed to be 0
-            lastIndex = -1
-            while True:
-                # Server first receives the index
-                data, addr = server_socket.recvfrom(1472)
-                header = data[:12] # Extract header from message
-                seq, ack, flags, win = parse_header(data)
-                # If index is "END", the client is done transferring the file
-                if flags == 8: #If flags == FIN
-                    break
-                # Server then receives the payload
-                print(f"Recieving chunk " + str(seq), end="\r")
-
-                if lastIndex == int(seq) - 1:
-                    # Append incoming data to file variable
-                    file += str(data[13:])
-                    print("mottatt" + str(seq))
-                    ack = create_packet(0, seq, 4, flags, window, None)
-                    server_socket.sendto(ack.encode(), client_address)
-                elif False:
-                    print("hei2")
-
-            # Save file to working directory
-            # filename += "received_" + datetime.datetime.now().strftime("%m/%d_%H-%M-%S") + ".txt"
-            filename = "received.txt"
-            with open(filename, "a+") as f:
-                f.write(file)
-            print(filename + " saved to working directory.")
-
-        filename = server_socket.recvfrom(1472)  # Receive data from client
 
 
-        ##### Kommentert ut ettersom dette ikke brukes av programmet (foreløpig?).
-        # Open the file , evt use wb to ensure that the data is sent as bytes
-        # with open(filename) as f:
-        #     while True:
-        #         data, serverAddress = server_socket.recvfrom(1472)
-        #         if not data:
-        #             break
-        #         f.write(data)  # Write the received data to the file
-        #
-        #         if reliability:
-        #             # send acknowledgment to client
-        #             msg = "ACK".encode()
-        #             server_socket.sendto(msg, serverAddress)
 
-        server_socket.close()
-        '''
+#Main client function, initialises the client with specified parameters
+def client(ip, port, filename, reliability, testcase, window_size):
+    #ip and port: Which IP-address and port the client should send to
+    #filename: path to file to be sent over the program
+    #reliability: What reliability protocol should be used for the connection
+    #testcase: XXXXX ????
+
+    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM) #Creating socket
+    serverAddress = (ip, port)      #The IP:PORT tuple is saved as a variable for simplicity
 
 
-def client(ip, port, filename, reliability, testcase):
-    # creating the socket and server address tuple
-    client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
-    serverAddress = (ip, port)
-
-    # Ping server and set client timeout
-    client_socket.settimeout(0.5)  # Set timeout for client
-    done = False  # Indicate completion of a task
-    timeout = None  # Time elapsed between sending a packet and receiven ACK
-    sequence_number = 1  # Sequence number for packets being sent
-    acknowledgment_number = 0  # ACK number for packets being sent
-    window = 0  # window size
-    flags = 0  # packet flags
-
+    #######
+    # Threeway handshake for initialising connection
+    # The handshake is also used for calculating the RTT and setting the timeout accordingly
+    #######
+    # 1. Send SYN to server
     print(f"Sending SYN to server", end="\r")
-
-    # ------------ Starten på ny kode knyttet til Three-way handshake  -----------------
-    # Sender sends a SYN (open; “synchronize
-    # sequence numbers”) to receiver
+    sequence_number = 1  # Sequence number for packets sent from client
+    acknowledgment_number = 0  # ACK number for packets sent from client
+    window = 0  # window size
+    flags = 8  # SYN flag
 
     # Create SYN packet
-    data = "SYN"
-    packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
-    startTime = time.time()
+    packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, "".encode())
+    start_time = time.time()
     client_socket.sendto(packet, serverAddress)
-    sequence_number += 1
 
-    # Receiver returns a SYN acknowledgment (SYN ACK)
-
-    # Receive response and parse header
+    # 2. Receive and parse SYN-ACK from server
     response, null = client_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(response)
-
-    # Kanksje legge til try catch?
-    if flags == 12:  # If flags == SYN:ACK
-        # Sender sends an ACK to acknowledge the SYN ACK
-        # Create ACK packet
-        data = "ACK"
-        packet = header.create_packet(sequence_number, ack, 4, window, data.encode())
+    if flags == 12:  # If flags == SYN+ACK
+        end_time = time.time()
+        # 3. Client sends final ACK to server
+        packet = header.create_packet(sequence_number, ack, 4, window, "".encode())
         client_socket.sendto(packet, serverAddress)
-        print("Final ACK has been sent to server")
 
-        try:
-            # Wait for final response to print
-            final_response, serverAddress = client_socket.recvfrom(1472)
-            print("Final response received from server: ", final_response.decode())
-        except client_socket.timeout:
-            print("Timeout occurred while waiting for final response from server")
-            client_socket.close()
-            return
-    else:
-        print("Error: Expected SYN ACK from server but received unexpected packet")
-        client_socket.close()
-        return
+    #######
+    #Set timeout using measured RTT
+    #######
+    timeout_s = end_time - start_time
+    client_socket.settimeout(4*timeout_s)
+    print("RTT: " + str(timeout_s) + ". Client socket timeout set to: " + str(4*timeout_s))
 
-        # -------------- slutten på ny kode knyttet til Three-way handshake -------------------
-        ## FEIL MATTE PÅ TIMEOUT, jeg har gjort noe men vet ikke om det er riktig
-        # Create PING packet
-        # DEPRECATED
-
-        data = "PING"
-        packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
-        startTime = time.time()
-        client_socket.sendto(packet, serverAddress)
-        sequence_number += 1
-
-        # Receive response and parse header
-        response, null = client_socket.recvfrom(1472)
-        seq, ack, flags, win = parse_header(response)
-
-        if flags == 4:  # If flags == ACK
-            # timeout = time.time() - startTime
-            timeoutDuration = 0.5
-
-            timeout = client_socket.settimeout(timeoutDuration)  # Set timeout for the client
-
-            # test packet
-            packet = 'Hello world!'.encode()
-            client_socket.sendto(packet, ('127.0.0.1', 8097))
-
-            try:
-                # wait for the response and calculates the RTT
-                start_time = time.time()
-                response, address = client_socket.recvfrom(1472)
-                end_time = time.time()
-                rtt_time = end_time - start_time  # calculates the RTT time
-                print('Response received: ', response.decode())
-                print('RTT: ', rtt_time)  # prints the calculated RTT
-
-                # Set timeout, if RTT lower than 10ms, timeout is set to 50ms
-                if rtt_time < 0.01:
-                    print("RTT is lower than 10ms. Setting timeout to 50ms. RTT: " + str(
-                        round(rtt_time * 1000, 2)) + "ms")
-                    client_socket.settimeout(0.5)
-                else:
-                    print("Setting client timeout to " + str(round(4 * rtt_time * 1000, 2)) + " RTT: " + str(
-                        round(rtt_time * 1000, 2)) + "ms.")
-                    client_socket.settimeout(4 * rtt_time)
-
-            except client_socket.timeout:
-                # If timeout occurs, retransmit the packet with adjusted timeout
-                print('Timeout occurred, retransmitting packet with adjusted timeout')
-
-                # Create PING packet
-                data = "PING"
-                packet = header.create_packet(sequence_number, acknowledgment_number, flags, window, data.encode())
-                client_socket.sendto(packet, serverAddress)
-                sequence_number += 1
-
-                # Update timeout and set it
-                try:
-                    start_time = time.time()
-                    response, address = client_socket.recvfrom(1472)
-                    end_time = time.time()
-                    rtt_time = end_time - start_time  # calculates the RTT time
-                    print('Response received: ', response.decode())
-                    print('RTT: ', rtt_time)  # prints the calculated RTT
-
-                    # Setting timeout. If RTT is lower than 10ms, timeout is set to a safe low value of 50ms
-                    # Otherwise, it's set to 4*RTT
-                    if rtt_time < 0.01:
-                        print("RTT is lower than 10ms. Setting client timeout to 50ms. Actual RTT: " + str(
-                            round(rtt_time * 1000, 2)) + "ms")
-                        client_socket.settimeout(0.5)
-                    else:
-                        print("RTT: " + str(round(rtt_time * 1000, 2)) + "ms. Setting client timeout to " + str(
-                            round(4 * rtt_time * 1000, 2)))
-                        client_socket.settimeout(4 * rtt_time)
-
-                except client_socket.timeout:
-                    # If timeout occurs again, retransmit the packet with the same timeout value
-                    print('Timeout occurred again, retransmitting packet with same timeout')
-                    client_socket.sendto(packet, serverAddress)
-                    sequence_number += 1
-                    client_socket.settimeout(timeout)
-
-    # Start file transfer
-    done = False
-    print("298. Filename:")
+    #######
+    # Read and prepare the file for transfer
+    #######
     # Open file in binary mode and read data
     with open(filename, "rb") as file:
         file_data = file.read()  # Read the contents of the file into a byte string
         file_size = len(file_data)  # Determine size in bytes of the file
-        packetsize = 1450  # Size of each packet
-        no_of_packets = int(math.ceil(
-            file_size / packetsize))  # Calculate number of packets in total for this file in packets of 1000 bytes
+        packetsize = 1460  # Size of each packet's payload.
+        no_of_packets = int(math.ceil(file_size / packetsize))  # Calculate number of packets this file needs to be split into.
 
-        # Split file into packets of max size of packetsize bytes
+        # Split file into an array where each index contains up to packetsize (1460) bytes
         split_file = []
         for index in range(0, file_size, packetsize):
             split_file.append(file_data[index:index + packetsize])
@@ -377,22 +214,17 @@ def client(ip, port, filename, reliability, testcase):
             no_of_packets))  # Print size of the file and number of packets requiered to send  the file
         print("No of packets: " + str(len(split_file)))  # Print number of packets the file was split into
 
-        client_socket.settimeout(1)
+        #######
+        # Create metadata containing the filename, total number of packets and the total file size
+        #######
+        metadata = pack_metadata(filename, no_of_packets, file_size)
+        packet = create_packet(1, 0, 0, window, metadata)
 
         while True:
             try:
-                print("1")
-                metadata = pack_metadata(filename, no_of_packets, file_size)
-                print("2")
-                packet = create_packet(0, 0, 0, window, metadata)
-                print("3")
                 client_socket.sendto(packet, serverAddress)
-                print("4")
-
                 response, null = client_socket.recvfrom(1472)
-                print("5")
                 seq, ack, flags, win = parse_header(response)
-                print("6")
                 if flags == 4 and ack == 0:
                     print("ACK received for metadata")
                     break
@@ -492,12 +324,7 @@ def client(ip, port, filename, reliability, testcase):
                     break
 
         # Send each packet with the chosen reliability protocol
-        if reliability == "SAW":
-            stop_wait()
-        elif reliability == "GBN":
-            gbn(filename, client_socket)  # Send packet using Go-Back-N protocol
-        elif reliability == "SR":
-            sr(filename, client_socket)  # Send packet using Selective Repeat protocol
+
 
         # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
         # If no ack received, it waits for timeout, and tries to send the packet again.
@@ -668,8 +495,6 @@ def client(ip, port, filename, reliability, testcase):
         print("Error closing connection from client")
     # ----- slutten på two way handshake -------
 '''
-
-
 # Packs file metadata. Used in client to tell server how to name the file and how big it is
 def pack_metadata(filename, no_of_packets, filesize):
     return (str(filename) + ":" + str(no_of_packets) + ":" + str(filesize)).encode()
@@ -694,7 +519,6 @@ def checkFile(filename):  # Checks if the file exists in the server's system
     else:
         return False
 
-
 def checkIP(val):  # Checks input of -i flag
     if val == "localhost":  # Used to skip regex, as "localhost" does not match the pattern of an IPv4 address
         return "localhost"
@@ -706,7 +530,6 @@ def checkIP(val):  # Checks input of -i flag
             if int(byte) < 0 or int(byte) > 255:
                 raise argparse.ArgumentTypeError(str(val) + "is not a valid IPv4 address")
     return val  # Return user specified IP if all checks pass
-
 
 def checkPort(val):  # Checks input of -p port flag
     try:
