@@ -449,10 +449,9 @@ def client(ip, port, filename, reliability, testcase, window_size):
             seq_num = 0  # Initialize sequence number of the first packet which is going to be sent
             retries = {}  # Dictionary to keep track of number of retries for each packet
             window_start = 0
-            window_end = window_start + window_size
 
             while window_start < len(packets):
-                for i in range(window_start, window_end):
+                for i in range(0, no_of_packets, window_size):
                     # Send packet if it has not been received yet
                     if not received_packets[i]:
                         client_socket.sendto(packets[i], serverAddress)
@@ -460,7 +459,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         retries[i] = 0  #  Initialize number of retries for this packet
 
                 # Wait for ACKs
-                for i in range(window_start, window_end):
+                for i in range(window_start, len(window_size)):
                     # Skip packets that have already been acknowledged
                     if received_packets[i]:
                         continue
@@ -469,21 +468,21 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         packet, serverAddress = client_socket.recvfrom(1472)  # Receive ACK packet from receiver
                         seq, ack, flags, win = parse_header(packet)
 
-                        if flags == 4 and seq == 0 and ack == window_end - 1:
+                        if flags == 4 and seq == 0 and ack == len(window_size):
                             # All packets have been successfully transmitted and acknowledged
                             for i in range(len(packets)):
                                 received_packets[i] = True
                             print("Transfer complete.")
                             return
 
-                        elif flags == 4 and window_start <= ack <= window_end:
+                        elif flags == 4 and window_start <= ack <= len(window_size):
                             # Packet has been successfully received and acknowledged
                             received_packets[ack] = True
                             print(f"Received ACK {ack}")
 
                     except client_socket.timeout:
                         # Resend packets in current window that have not been acknowledged
-                        for i in range(window_start, window_end):
+                        for i in range(0, no_of_packets, window_size):
                             if not received_packets[i]:
                                 if retries[i] < 3:
                                     # Resend packet and increment number of retries for this packet
@@ -494,7 +493,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                                     # Packet dropped after maximum number of retries
                                     print(f"Packet with sequence no.{i} dropped after 3 retries.")
                                     # Resend all packets from the dropped packet onwards
-                                    for j in range(i, window_end):
+                                    for j in range(i, len(window_size)):
                                         client_socket.sendto(packets[j], serverAddress)
                                         print(f"Resent packet with sequence no.{j}")
                                     break
