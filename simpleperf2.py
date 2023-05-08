@@ -95,19 +95,19 @@ def server(ip, port, reliability, testcase, window_size):
     # for ACK of the previous packet.
     def gbn(filename):
         i = 0
-        #for i in range (0, no_of_packets-1, window_size):
+        # for i in range (0, no_of_packets-1, window_size):
         while i < no_of_packets:
-            received_this_window = [None]*window_size
-            done = False #Used to run until all packets are received
-            scope = i+window_size
-            if (i+window_size >= no_of_packets):
-                scope = no_of_packets-1
+            received_this_window = [None] * window_size
+            done = False  # Used to run until all packets are received
+            scope = i + window_size
+            if (i + window_size >= no_of_packets):
+                scope = no_of_packets - 1
             while not done:
                 j = i
                 while j <= scope:
-                #for j in range (i, scope):
+                    # for j in range (i, scope):
                     try:
-                        #Receive packet
+                        # Receive packet
                         packet, client_address = server_socket.recvfrom(1472)
                         seq, ack, flags, win = parse_header(packet)
                         data = packet[12:]
@@ -142,6 +142,7 @@ def server(ip, port, reliability, testcase, window_size):
                     server_socket.sendto(response, client_address)
             except Exception as e:
                 print(f"Exception occurred: {e}")
+
     def sr():
         with open(filename, "rb") as f:
             expSeqNo = 0  # Expected seq number in order to keep track
@@ -194,13 +195,14 @@ def server(ip, port, reliability, testcase, window_size):
             finalFile += arrayItem
         except Exception as e:
             print("Could not add file with index " + str(i) + " to working file. e: " + str(e))
-    filename = filename.replace('\0','')
+    filename = filename.replace('\0', '')
     f = open((f'received_{str(filename)}'), "wb")
     f.write(finalFile)
     f.close()
-    #Clear last line and print completion message.
+    # Clear last line and print completion message.
     print("                                                                      ", end="\r")
     print("Successfully saved file as " + str(filename))
+
 
 '''
     # close server
@@ -308,7 +310,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     #######
     # Read and prepare the file for transfer
     #######
-    #Initialising variables
+    # Initialising variables
     file_data = None
     file_size = 0
     packetsize = 1460  # Size of each packet's payload.
@@ -318,7 +320,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     with open(filename, "rb") as file:
         file_data = file.read()  # Read the contents of the file into a byte string
         file_size = len(file_data)  # Determine size in bytes of the file
-        #no_of_packets = int(math.ceil(file_size / packetsize))  # Calculate number of packets this file needs to be split into.
+        # no_of_packets = int(math.ceil(file_size / packetsize))  # Calculate number of packets this file needs to be split into.
 
         # Split file into an array where each index contains up to packetsize (1460) bytes
         for index in range(0, file_size, packetsize):
@@ -327,9 +329,9 @@ def client(ip, port, filename, reliability, testcase, window_size):
         no_of_packets = len(split_file)
 
         # Print file information
-        #print("Opened file: " + str(filename))  # Print name of the opened file
-        #print("File size: " + str(file_size) + ", no of packets: " + str(no_of_packets))  # Print size of the file and number of packets requiered to send  the file
-        #print("No of packets: " + str(len(split_file)))  # Print number of packets the file was split into
+        # print("Opened file: " + str(filename))  # Print name of the opened file
+        # print("File size: " + str(file_size) + ", no of packets: " + str(no_of_packets))  # Print size of the file and number of packets requiered to send  the file
+        # print("No of packets: " + str(len(split_file)))  # Print number of packets the file was split into
 
         #######
         # Create metadata containing the filename, total number of packets and the total file size
@@ -353,13 +355,14 @@ def client(ip, port, filename, reliability, testcase, window_size):
         # Sequence_number is used as an offset for i to send the correct seq to server
 
         for i, packet_data in enumerate(split_file):
-            print(f"Sending packet {i} of {no_of_packets-1}", end="\r")  # Print a progress message of which package is being sent
+            print(f"Sending packet {i} of {no_of_packets - 1}",
+                  end="\r")  # Print a progress message of which package is being sent
             # packet = create_packet(i+offset, ack, flags, win, packet_data)
             packet = create_packet(i, 0, 0, window_size, packet_data)
 
             # Send packet and wait for ACK
             retries = 0
-            while retries <= 2*no_of_packets: #Dynamically scales allowed amount of retries based on filesize
+            while retries <= 2 * no_of_packets:  # Dynamically scales allowed amount of retries based on filesize
                 try:
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
@@ -390,17 +393,17 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # for ACK of the previous packet.
     def gbn(serverAddress):
         i = 0
-        #for i in range (0, no_of_packets-1, window_size):
-        while i <= no_of_packets-1:
-            done = False #Used to run until all packets are sent
-            scope = i+window_size
-            if (i+window_size >= no_of_packets):
-                scope = no_of_packets-1
+        # for i in range (0, no_of_packets-1, window_size):
+        while i <= no_of_packets - 1:
+            done = False  # Used to run until all packets are sent
+            scope = i + window_size
+            if (i + window_size >= no_of_packets):
+                scope = no_of_packets - 1
             while not done:
                 j = i
                 while j <= scope:
-                #for j in range (i, scope, 1):
-                    if j > no_of_packets-1:
+                    # for j in range (i, scope, 1):
+                    if j > no_of_packets - 1:
                         print("Outside of split_file index")
                         break
                     data = split_file[j]
@@ -420,7 +423,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                             # print(f"Received ACK for packet with sequence number: {i+offset}")
                             print(f"Received ACK for packet with sequence number: {ack}", end="\r")
                             j += 1
-                            if j == no_of_packets-1 or j == i+window_size:
+                            if j == no_of_packets - 1 or j == i + window_size:
                                 done = True
                         # elif flags == 4 and ack == i+offset-1:
                         elif not ack == j:
@@ -433,80 +436,124 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         j = i
             i += window_size
 
-
-
     # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
     # If no ack received, it waits for timeout, and tries to send the packet again.
 
     # SR: Du får ack etter hver eneste pakke.
 
-        # -------- koder ny def sr -----------
-    def sr():
-        # Variables
-        seq_num = 0  # Initialize sequence number of the first packet which is going to be sent
-        retries = {}  # Dictionary to keep track of number of retries for each packet
-        window_start = 0
-
-        while window_start < len(packets):
-            for i in range(0, no_of_packets, window_size):
-                # Send packet if it has not been received yet
-                if not received_packets[i]:
-                    client_socket.sendto(packets[i], serverAddress)
-                    print(f"Packet with sequence no.{i} sent")
-                    retries[i] = 0  # Initialize number of retries for this packet
-
-            # Wait for ACKs
-            for i in range(window_start, len(window_size)):
-                # Skip packets that have already been acknowledged
-                if received_packets[i]:
-                    continue
-
+    # -------- koder ny def sr -----------
+    def sr(serverAddress):
+        i = 0
+        while i <= no_of_packets - 1:
+            done = False
+            scope = i + window_size
+            if i + window_size >= no_of_packets:
+                scope = no_of_packets - 1
+            packets_sent = []
+            while not done:
+                j = i
+                while j <= scope:
+                    if j > no_of_packets - 1:
+                        print("Outside of split_file index")
+                        break
+                    if j not in packets_sent:
+                        data = split_file[j]
+                        packet = create_packet(j, 0, 0, window_size, data)
+                        try:
+                            client_socket.sendto(packet, serverAddress)
+                            print(f"Sent packet with sequence number: {j}", end="\r")
+                            packets_sent.append(j)
+                        except Exception as e:
+                            print("Issue when sending packet using SR: " + str(e))
+                    j += 1
                 try:
-                    packet, serverAddress = client_socket.recvfrom(1472)  # Receive ACK packet from receiver
-                    seq, ack, flags, win = parse_header(packet)
+                    client_socket.settimeout(0.5) # set a timeout for receiving ACKs
+                    while True:
+                        response, null = client_socket.recvfrom(1472)
+                        seq, ack, flags, win = parse_header(response)
+                        if flags == 4 and ack in packets_sent:
+                            print(f"Received ACK for packet with sequence number: {ack}", end="\r")
+                            packets_sent.remove(ack)
+                            if not packets_sent:
+                                done = True
+                except socket.timeout:
+                    # no ACK received within timeout, retransmit unacknowledged packets
+                    for packet_number in packets_sent:
+                        data = split_file[packet_number]
+                        packet = create_packet(packet_number, 0, 0, window_size, data)
+                        try:
+                            client_socket.sendto(packet, serverAddress)
+                            print(f"Retransmitted packet with sequence number: {packet_number}", end="\r")
+                        except Exception as e:
+                            print("Issue when sending packet using SR: " + str(e))
+            i += window_size
 
-                    if flags == 4 and seq == 0 and ack == len(window_size):
-                        # All packets have been successfully transmitted and acknowledged
-                        for i in range(len(packets)):
-                            received_packets[i] = True
-                        return
-
-                    elif flags == 4 and window_start <= ack <= len(window_size):
-                        # Packet has been successfully received and acknowledged
-                        received_packets[ack] = True
-                        print(f"Received ACK {ack}")
-
-                except client_socket.timeout:
-                    # Resend packets in current window that have not been acknowledged
-                    for i in range(0, no_of_packets, window_size):
-                        if not received_packets[i]:
-                            if retries[i] < 3:
-                                # Resend packet and increment number of retries for this packet
-                                client_socket.sendto(packets[i], serverAddress)
-                                print(f"Resent packet with sequence no.{i}")
-                                retries[i] += 1
-                            else:
-                                # Packet dropped after maximum number of retries
-                                print(f"Packet with sequence no.{i} dropped after 3 retries.")
-                                # Resend all packets from the dropped packet onwards
-                                for j in range(i, len(window_size)):
-                                    client_socket.sendto(packets[j], serverAddress)
-                                    print(f"Resent packet with sequence no.{j}")
-                                break
-
-            # Move the sliding window forward
-            while received_packets[seq_num] and seq_num < len(packets):
-                seq_num += 1
-
-            # Check if all packets have been acknowledged and break out of loop
-            if seq_num == len(packets):
-                print("All packets have been acknowledged.")
-                break
-
-            # Update the window start and end positions
-            window_start = seq_num
-
-        print("Transfer complete.")
+    # def sr():
+    #     # Variables
+    #     seq_num = 0  # Initialize sequence number of the first packet which is going to be sent
+    #     retries = {}  # Dictionary to keep track of number of retries for each packet
+    #     window_start = 0
+    #
+    #     while window_start < len(packets):
+    #         for i in range(0, no_of_packets, window_size):
+    #             # Send packet if it has not been received yet
+    #             if not received_packets[i]:
+    #                 client_socket.sendto(packets[i], serverAddress)
+    #                 print(f"Packet with sequence no.{i} sent")
+    #                 retries[i] = 0  # Initialize number of retries for this packet
+    #
+    #         # Wait for ACKs
+    #         for i in range(window_start, len(window_size)):
+    #             # Skip packets that have already been acknowledged
+    #             if received_packets[i]:
+    #                 continue
+    #
+    #             try:
+    #                 packet, serverAddress = client_socket.recvfrom(1472)  # Receive ACK packet from receiver
+    #                 seq, ack, flags, win = parse_header(packet)
+    #
+    #                 if flags == 4 and seq == 0 and ack == len(window_size):
+    #                     # All packets have been successfully transmitted and acknowledged
+    #                     for i in range(len(packets)):
+    #                         received_packets[i] = True
+    #                     return
+    #
+    #                 elif flags == 4 and window_start <= ack <= len(window_size):
+    #                     # Packet has been successfully received and acknowledged
+    #                     received_packets[ack] = True
+    #                     print(f"Received ACK {ack}")
+    #
+    #             except client_socket.timeout:
+    #                 # Resend packets in current window that have not been acknowledged
+    #                 for i in range(0, no_of_packets, window_size):
+    #                     if not received_packets[i]:
+    #                         if retries[i] < 3:
+    #                             # Resend packet and increment number of retries for this packet
+    #                             client_socket.sendto(packets[i], serverAddress)
+    #                             print(f"Resent packet with sequence no.{i}")
+    #                             retries[i] += 1
+    #                         else:
+    #                             # Packet dropped after maximum number of retries
+    #                             print(f"Packet with sequence no.{i} dropped after 3 retries.")
+    #                             # Resend all packets from the dropped packet onwards
+    #                             for j in range(i, len(window_size)):
+    #                                 client_socket.sendto(packets[j], serverAddress)
+    #                                 print(f"Resent packet with sequence no.{j}")
+    #                             break
+    #
+    #         # Move the sliding window forward
+    #         while received_packets[seq_num] and seq_num < len(packets):
+    #             seq_num += 1
+    #
+    #         # Check if all packets have been acknowledged and break out of loop
+    #         if seq_num == len(packets):
+    #             print("All packets have been acknowledged.")
+    #             break
+    #
+    #         # Update the window start and end positions
+    #         window_start = seq_num
+    #
+    #     print("Transfer complete.")
 
     def sr_gbn(filename, socket):
         socket.settimeout(0.5)  # Set timeout to 500ms
@@ -561,7 +608,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
         print('Transfer complete.')
 
-
     # Send file with chosen reliability protocol
     if reliability == "SAW":
         stop_wait()
@@ -570,9 +616,10 @@ def client(ip, port, filename, reliability, testcase, window_size):
     elif reliability == "SR":
         sr()  # Send packet using Selective Repeat protocol
     file.close()
-    #Clear last line and print completion message.
+    # Clear last line and print completion message.
     print("                                                                      ", end="\r")
     print("Transfer complete.")
+
 
 '''
     # ------- two way handshake ---------
@@ -632,6 +679,7 @@ def checkFile(filename):  # Checks if the file exists in the server's system
     else:
         raise argparse.ArgumentTypeError("Could not find file with path " + str(filename))
 
+
 def checkIP(val):  # Checks input of -i flag
     if val == "localhost":  # Used to skip regex, as "localhost" does not match the pattern of an IPv4 address
         return "localhost"
@@ -682,15 +730,17 @@ def checkTestCase(val):
     elif val == "LOSS":
         return "LOSS"
     else:
-        raise Exception("Could not parse -t testcase input. Expected: \"SKIP_ACK\", \"SKIP_SEQ\" or \"LOSS\", Actual: " + str(val))
+        raise Exception(
+            "Could not parse -t testcase input. Expected: \"SKIP_ACK\", \"SKIP_SEQ\" or \"LOSS\", Actual: " + str(val))
 
 
 def checkWindow(val):
     val = int(val)
     if not (1 <= val <= 15):
-        raise Exception("Invalid window_size. Expected value between 1 and 15. Actual: " +str(val))
+        raise Exception("Invalid window_size. Expected value between 1 and 15. Actual: " + str(val))
     else:
         return val
+
 
 parser = argparse.ArgumentParser(description="positional arguments",
                                  epilog="end of help")  # Initialises argsparse parser
