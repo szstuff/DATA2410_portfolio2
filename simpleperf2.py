@@ -95,7 +95,9 @@ def server(ip, port, reliability, testcase, window_size):
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
     def gbn(filename):
-        for i in range (0, no_of_packets-1, window_size):
+        i = 0
+        #for i in range (0, no_of_packets-1, window_size):
+        while i < no_of_packets:
             print("i: " + str(i))
             received_this_window = [None]*window_size
             done = False #Used to run until all packets are received
@@ -106,11 +108,13 @@ def server(ip, port, reliability, testcase, window_size):
             while not done:
                 j = i
                 while j <= scope:
+                    print("i: " + str(i) + ". j: " + str(j))
                 #for j in range (i, scope):
                     try:
                         #Receive packet
                         packet, client_address = server_socket.recvfrom(1472)
                         seq, ack, flags, win = parse_header(packet)
+                        print("seq: " + str(seq))
                         data = packet[12:]
                         if not j == seq:
                             print("Unexpected sequence number: " + str(seq) + ". j: " + str(j))
@@ -127,6 +131,8 @@ def server(ip, port, reliability, testcase, window_size):
 
                     except Exception as e:
                         print("Exception when receiving data with GBN: " + str(e))
+                        j = i
+            i += window_size
     '''
         while True:
                 # Wait for ACK
@@ -224,13 +230,18 @@ def server(ip, port, reliability, testcase, window_size):
         sr()
     print(received_data)
 
-    finalFile = ""
+    finalFile = b''
     for i, arrayItem in enumerate(received_data):
-        print("ARRAYITEM")
-        print(arrayItem)
-        finalFile += arrayItem.decode()
+        try:
+            print("ARRAYITEM")
+            print(arrayItem)
+            finalFile += arrayItem
+        except Exception as e:
+            print("Could not add file with index " + str(i) + " to working file. e: " + str(e))
+            finalFile += arrayItem
+            print("Added without decoding")
 
-    f = open(("_recieved.txt"), "w")
+    f = open(("_recieved.txt"), "wb")
     f.write(finalFile)
     f.close()
 
@@ -340,15 +351,19 @@ def client(ip, port, filename, reliability, testcase, window_size):
     #######
     # Read and prepare the file for transfer
     #######
+    #Initialising variables
+    file_data = None
+    file_size = 0
+    packetsize = 1460  # Size of each packet's payload.
+    no_of_packets = 0
+    split_file = []
     # Open file in binary mode and read data
     with open(filename, "rb") as file:
         file_data = file.read()  # Read the contents of the file into a byte string
         file_size = len(file_data)  # Determine size in bytes of the file
-        packetsize = 1460  # Size of each packet's payload.
         #no_of_packets = int(math.ceil(file_size / packetsize))  # Calculate number of packets this file needs to be split into.
 
         # Split file into an array where each index contains up to packetsize (1460) bytes
-        split_file = []
         for index in range(0, file_size, packetsize):
             split_file.append(file_data[index:index + packetsize])
 
@@ -356,8 +371,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
         # Print file information
         print("Opened file: " + str(filename))  # Print name of the opened file
-        print("File size: " + str(file_size) + ", no of packets: " + str(
-            no_of_packets))  # Print size of the file and number of packets requiered to send  the file
+        print("File size: " + str(file_size) + ", no of packets: " + str(no_of_packets))  # Print size of the file and number of packets requiered to send  the file
         print("No of packets: " + str(len(split_file)))  # Print number of packets the file was split into
 
         #######
@@ -377,9 +391,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
             except Exception as e:
                 print("Exception when sending metadata: " + str(e))
 
-        received_packets = [False] * no_of_packets  # Array to save received packets and their sequence numbers
-        packets = []  # Create empty array list for packets
-
     def stop_wait():
         print("stopwait")
         offset = sequence_number  # Sequence_number is not 0 because of previous messages.
@@ -393,7 +404,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
             # Send packet and wait for ACK
             retries = 0
-            while retries <= 3:
+            while retries <= 2*no_of_packets: #Dynamically scales allowed amount of retries based on filesize
                 try:
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
@@ -425,7 +436,9 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
     def gbn(serverAddress):
-        for i in range (0, no_of_packets-1, window_size):
+        i = 0
+        #for i in range (0, no_of_packets-1, window_size):
+        while i <= no_of_packets-1:
             done = False #Used to run until all packets are sent
             scope = i+window_size
             if (i+window_size >= no_of_packets):
@@ -439,7 +452,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     if j > no_of_packets-1:
                         print("Outside of split_file index")
                         break
-                    print("Sending packet with index: " + str(i) +". j: " + str(j))
                     data = split_file[j]
                     packet = create_packet(j, 0, 0, window_size, data)
                     try:
@@ -450,8 +462,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                         # Receive ACK
                         response, null = client_socket.recvfrom(1472)
-                        print("RESPONSE")
-                        print(response)
                         seq, ack, flags, win = parse_header(response)
                         # Check if received ACK is for the expected sequence number
                         # if flags == 4 and ack == i+offset: #If flags = ACK and ack is equal to seq
@@ -459,17 +469,19 @@ def client(ip, port, filename, reliability, testcase, window_size):
                             # print(f"Received ACK for packet with sequence number: {i+offset}")
                             print(f"Received ACK for packet with sequence number: {ack}")
                             j += 1
-                            if j == no_of_packets-1:
+                            if j == no_of_packets-1 or j == i+window_size:
                                 done = True
                         # elif flags == 4 and ack == i+offset-1:
                         elif not ack == j:
                             print("Received unexpected ack: " + str(ack) + ". j: " + str(j))
                         else:
                             print(f"Received unexpected response with sequence number: {ack}")
-                            break
 
                     except Exception as e:
                         print("Issue when sending packet using GBN: " + str(e))
+                        j = i
+            print("I + windowsize")
+            i += window_size
             '''
         while True:
             # Send packets up to window size
@@ -687,6 +699,7 @@ def pack_metadata(filename, no_of_packets, filesize):
 def unpack_metadata(metadata):
     metadata = metadata.decode()
     array = metadata.split(":")
+    print(array)
     filename = array[0]
     no_of_packets = array[1]
     filesize = array[2]
@@ -697,11 +710,12 @@ def unpack_metadata(metadata):
 ###
 
 def checkFile(filename):  # Checks if the file exists in the server's system
+    if filename == None:
+        return None
     if os.path.isfile(filename):
         return filename
     else:
-        return False
-
+        raise argparse.ArgumentTypeError("Could not find file with path " + str(filename))
 
 def checkIP(val):  # Checks input of -i flag
     if val == "localhost":  # Used to skip regex, as "localhost" does not match the pattern of an IPv4 address
@@ -771,8 +785,8 @@ parser.add_argument('-c', '--client', action='store_true', default=False, help="
 parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
 ### FJERN FØR INNLEVERING: index.html. Bytt til None elns
-parser.add_argument('-f', '--file', type=checkFile, default="index.html", help="Path to file to transfer")
-parser.add_argument('-r', '--reliable', type=checkReliability, default=None, help="Choose reliable method (GBN or SR)")
+parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
+parser.add_argument('-r', '--reliable', type=checkReliability, default="SAW", help="Choose reliable method (GBN or SR)")
 parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="XXXX")
 parser.add_argument('-w', '--windowsize', type=checkWindow, default=5, help="XXXX")
 args = parser.parse_args()  # Parses arguments provided by user
