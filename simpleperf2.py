@@ -225,10 +225,10 @@ def server(ip, port, reliability, testcase, window_size):
     f = open((f'received_{str(filename)}'), "wb")
     f.write(finalFile)
     f.close()
+
     # Clear last line and print completion message.
     print("                                                                      ")
     print("Successfully saved file as " + str(filename))
-'''
 
     # close server
     # A two-way handshake to close the connection
@@ -254,7 +254,6 @@ def server(ip, port, reliability, testcase, window_size):
     else:
         print("Error closing connection from server")
     # ------- slutten på two way handshake -----------
-'''
 
 
 # Main client function, initialises the client with specified parameters
@@ -311,6 +310,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     packetsize = 1460  # Size of each packet's payload.
     no_of_packets = 0
     split_file = []
+
     # Open file in binary mode and read data
     with open(filename, "rb") as file:
         file_data = file.read()  # Read the contents of the file into a byte string
@@ -623,11 +623,13 @@ def client(ip, port, filename, reliability, testcase, window_size):
         gbn(serverAddress)  # Send packet using Go-Back-N protocol
     elif reliability == "SR":
         sr(serverAddress)  # Send packet using Selective Repeat protocol
+
     file.close()
+
     # Clear last line and print completion message.
     print("                                                                      ")
     print("Transfer complete.")
-'''
+
     # ------- two way handshake ---------
     # ends the connection with a two-way handshake
     # Create FIN packet and sends to server
@@ -654,7 +656,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
         print("Error closing connection from client")
 
     # ----- slutten på two way handshake -------
-'''
+
 # Packs file metadata. Used in client to tell server how to name the file and how big it is
 def pack_metadata(filename, no_of_packets, filesize):
     return (str(filename) + ":" + str(no_of_packets) + ":" + str(filesize)).encode()
