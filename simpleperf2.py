@@ -35,7 +35,7 @@ def server(ip, port, reliability, testcase, window_size):
             # is shown. It's worth noting that the last port can't be tested because of this
             raise Exception("Could not bind to any port on IP " + str(ip))
 
-    print("Server is up and listening on " + str(ip) + ":" + str(port), end="\r")
+    print("Server is up and listening on " + str(ip) + ":" + str(port))
 
     #######
     # Threeway handshake for initialising connection
@@ -54,17 +54,19 @@ def server(ip, port, reliability, testcase, window_size):
 
     packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
     server_socket.sendto(packet, client_address)
-    print("Sent SYN-ACK to client", end="\r")
+    print("Sent SYN-ACK to client")
 
     # 3. Receive final ACK from client
     data, client_address = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
+    print("Receive final ACK from client")
+    print(data)
 
     if not flags == 4:
         print(str(flags))
         raise Exception("Expected SYN (8) packet. Received: " + str(flags))
     else:
-        print("ACK has been received, connection established.", end="\r")
+        print("ACK has been received, connection established.")
 
     # Preparing for file transfer
     filename = ""
@@ -78,6 +80,8 @@ def server(ip, port, reliability, testcase, window_size):
     while True:
         try:
             metadata, client_address = server_socket.recvfrom(1472)
+            print("Receive metadata")
+            print(metadata)
             filename, no_of_packets, expectedFilesize = unpack_metadata(metadata)
             no_of_packets = int(no_of_packets)
             expectedFilesize = int(expectedFilesize)
@@ -87,10 +91,12 @@ def server(ip, port, reliability, testcase, window_size):
 
             response = create_packet(0, 0, 4, window_size, "".encode())
             server_socket.sendto(response, client_address)
-            print("Sent ACK for metadata", end="\r")
+            print("Sent ACK for metadata")
             break
         except Exception as e:
             raise Exception("Exception when receiving metadata" + str(e))
+
+    print("Out of metadata")
 
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
@@ -109,6 +115,8 @@ def server(ip, port, reliability, testcase, window_size):
                     try:
                         # Receive packet
                         packet, client_address = server_socket.recvfrom(1472)
+                        print("GBN")
+                        print(packet)
                         seq, ack, flags, win = parse_header(packet)
                         data = packet[12:]
                         if not j == seq:
@@ -118,7 +126,7 @@ def server(ip, port, reliability, testcase, window_size):
                         received_data[seq] = data
                         response = create_packet(seq, seq, 4, window_size, "".encode())
                         server_socket.sendto(response, client_address)
-                        print(f"Received index " + str(seq), end="\r")
+                        print(f"Received index " + str(seq))
 
                         if j == scope:
                             done = True
@@ -136,22 +144,24 @@ def server(ip, port, reliability, testcase, window_size):
                 seq, ack, flags, win = parse_header(packet)
                 data = packet[12:]
                 if seq == i:
-                    print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq), end="\r")
+                    print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
                     received_data[seq] = data
                     response = create_packet(seq, seq, 4, window_size, "".encode())
                     server_socket.sendto(response, client_address)
             except Exception as e:
                 print(f"Exception occurred: {e}")
 
-
     def stop_wait():
+        print("I SAW")
         for i in range(no_of_packets):
             try:
                 packet, client_address = server_socket.recvfrom(1472)
+                print("SAW")
+                print(packet)
                 seq, ack, flags, win = parse_header(packet)
                 data = packet[12:]
                 if seq == i:
-                    print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq), end="\r")
+                    print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
                     received_data[seq] = data
                     response = create_packet(seq, seq, 4, window_size, "".encode())
                     server_socket.sendto(response, client_address)
@@ -216,8 +226,9 @@ def server(ip, port, reliability, testcase, window_size):
     f.write(finalFile)
     f.close()
     # Clear last line and print completion message.
-    print("                                                                      ", end="\r")
+    print("                                                                      ")
     print("Successfully saved file as " + str(filename))
+'''
 
     # close server
     # A two-way handshake to close the connection
@@ -243,6 +254,7 @@ def server(ip, port, reliability, testcase, window_size):
     else:
         print("Error closing connection from server")
     # ------- slutten på two way handshake -----------
+'''
 
 
 # Main client function, initialises the client with specified parameters
@@ -260,7 +272,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # The handshake is also used for calculating the RTT and setting the timeout accordingly
     #######
     # 1. Send SYN to server
-    print(f"Sending SYN to server", end="\r")
+    print(f"Sending SYN to server")
     sequence_number = 1  # Sequence number for packets sent from client
     acknowledgment_number = 0  # ACK number for packets sent from client
     flags = 8  # SYN flag
@@ -326,9 +338,11 @@ def client(ip, port, filename, reliability, testcase, window_size):
             try:
                 client_socket.sendto(packet, serverAddress)
                 response, null = client_socket.recvfrom(1472)
+                print("METADATA")
+                print(response)
                 seq, ack, flags, win = parse_header(response)
                 if flags == 4 and ack == 0:
-                    print("ACK received for metadata", end="\r")
+                    print("ACK received for metadata")
                     break
             except Exception as e:
                 print("Exception when sending metadata: " + str(e))
@@ -350,16 +364,18 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
                     # print(f"Sent packet with sequence number: {i+offset}")
-                    print(f"Sent packet with sequence number: {i}", end="\r")
+                    print(f"Sent packet with sequence number: {i}")
 
                     # Receive ACK
                     response, null = client_socket.recvfrom(1472)
+                    print("RECV")
+                    print(response)
                     seq, ack, flags, win = parse_header(response)
                     # Check if received ACK is for the expected sequence number
                     # if flags == 4 and ack == i+offset: #If flags = ACK and ack is equal to seq
                     if flags == 4 and ack == i:  # If flags = ACK and ack is equal to seq
                         # print(f"Received ACK for packet with sequence number: {i+offset}")
-                        print(f"Received ACK for packet with sequence number: {i}", end="\r")
+                        print(f"Received ACK for packet with sequence number: {i}")
                         break
                     # elif flags == 4 and ack == i+offset-1:
                     elif flags == 4 and ack == i - 1:
@@ -368,7 +384,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                 except socket.timeout:
                     retries += 1
-                    print(f"Timeout for packet with sequence number: {i}, resending", end="\r")
+                    print(f"Timeout for packet with sequence number: {i}, resending")
                     # Timeout occurred, re-send packet
                     continue
 
@@ -395,7 +411,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         # Send packet to receiver
                         client_socket.sendto(packet, serverAddress)
                         # print(f"Sent packet with sequence number: {i+offset}")
-                        print(f"Sent packet with sequence number: {j}", end="\r")
+                        print(f"Sent packet with sequence number: {j}")
 
                         # Receive ACK
                         response, null = client_socket.recvfrom(1472)
@@ -404,7 +420,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         # if flags == 4 and ack == i+offset: #If flags = ACK and ack is equal to seq
                         if flags == 4 and ack == j:  # If flags = ACK and ack is equal to seq
                             # print(f"Received ACK for packet with sequence number: {i+offset}")
-                            print(f"Received ACK for packet with sequence number: {ack}", end="\r")
+                            print(f"Received ACK for packet with sequence number: {ack}")
                             j += 1
                             if j == no_of_packets - 1 or j == i + window_size:
                                 done = True
@@ -436,7 +452,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 try:
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
-                    print(f"Sent packet with sequence number: {j}", end="\r")
+                    print(f"Sent packet with sequence number: {j}")
 
                     # Receive ACK
                     response, null = client_socket.recvfrom(1472)
@@ -445,7 +461,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     # if flags == 4 and ack == i+offset: #If flags = ACK and ack is equal to seq
                     if flags == 4 and ack == j:  # If flags = ACK and ack is equal to seq
                         # print(f"Received ACK for packet with sequence number: {i+offset}")
-                        print(f"Received ACK for packet with sequence number: {ack}", end="\r")
+                        print(f"Received ACK for packet with sequence number: {ack}")
                         j += 1
                         if j == no_of_packets - 1 or j == i + window_size:
                             break
@@ -467,14 +483,14 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     try:
                         # Send packet to receiver
                         client_socket.sendto(packet, serverAddress)
-                        print(f"Sent packet with sequence number: {j}", end="\r")
+                        print(f"Sent packet with sequence number: {j}")
 
                         # Receive ACK
                         response, null = client_socket.recvfrom(1472)
                         seq, ack, flags, win = parse_header(response)
                         # Check if received ACK is for the expected sequence number
                         if flags == 4 and ack == j:  # If flags = ACK and ack is equal to seq
-                            print(f"Received ACK for packet with sequence number: {ack}", end="\r")
+                            print(f"Received ACK for packet with sequence number: {ack}")
 
                         elif not ack == j:
                             print("Received unexpected ack: " + str(ack) + ". j: " + str(j))
@@ -511,7 +527,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         packet = create_packet(j, 0, 0, window_size, data)
                         try:
                             client_socket.sendto(packet, serverAddress)
-                            print(f"Sent packet with sequence number: {j}", end="\r")
+                            print(f"Sent packet with sequence number: {j}")
                             packets_sent.append(j)
                         except Exception as e:
                             print("Issue when sending packet using SR: " + str(e))
@@ -522,7 +538,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         response, null = client_socket.recvfrom(1472)
                         seq, ack, flags, win = parse_header(response)
                         if flags == 4 and ack in packets_sent:
-                            print(f"Received ACK for packet with sequence number: {ack}", end="\r")
+                            print(f"Received ACK for packet with sequence number: {ack}")
                             packets_sent.remove(ack)
                             if not packets_sent:
                                 done = True
@@ -533,7 +549,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         packet = create_packet(packet_number, 0, 0, window_size, data)
                         try:
                             client_socket.sendto(packet, serverAddress)
-                            print(f"Retransmitted packet with sequence number: {packet_number}", end="\r")
+                            print(f"Retransmitted packet with sequence number: {packet_number}")
                         except Exception as e:
                             print("Issue when sending packet using SR: " + str(e))
             i += window_size
@@ -557,7 +573,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         packet = create_packet(j, 0, 0, window_size, data)
                         try:
                             client_socket.sendto(packet, serverAddress)
-                            print(f"Sent packet with sequence number: {j}", end="\r")
+                            print(f"Sent packet with sequence number: {j}")
                             packets_sent.append(j)
                         except Exception as e:
                             print("Issue when sending packet using hybrid method: " + str(e))
@@ -568,7 +584,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         response, null = client_socket.recvfrom(1472)
                         seq, ack, flags, win = parse_header(response)
                         if flags == 4 and ack in packets_sent:
-                            print(f"Received ACK for packet with sequence number: {ack}", end="\r")
+                            print(f"Received ACK for packet with sequence number: {ack}")
                             packets_sent.remove(ack)
                             if not packets_sent:
                                 done = True
@@ -579,7 +595,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         packet = create_packet(packet_number, 0, 0, window_size, data)
                         try:
                             client_socket.sendto(packet, serverAddress)
-                            print(f"Retransmitted packet with sequence number: {packet_number} using GBN", end="\r")
+                            print(f"Retransmitted packet with sequence number: {packet_number} using GBN")
                         except Exception as e:
                             print("Issue when sending packet using hybrid method: " + str(e))
                     # wait for GBN to complete transmission
@@ -588,12 +604,12 @@ def client(ip, port, filename, reliability, testcase, window_size):
                             response, null = client_socket.recvfrom(1472)
                             seq, ack, flags, win = parse_header(response)
                             if flags == 4 and ack in packets_sent:
-                                print(f"Received ACK for packet with sequence number: {ack} using GBN", end="\r")
+                                print(f"Received ACK for packet with sequence number: {ack} using GBN")
                                 packets_sent.remove(ack)
                                 if not packets_sent:
                                     done = True
                             elif not ack in packets_sent:
-                                print(f"Received unexpected ACK with sequence number: {ack} using GBN", end="\r")
+                                print(f"Received unexpected ACK with sequence number: {ack} using GBN")
                     except socket.timeout:
                         # no more ACKs received, switch back to SR
                         break
@@ -609,9 +625,9 @@ def client(ip, port, filename, reliability, testcase, window_size):
         sr(serverAddress)  # Send packet using Selective Repeat protocol
     file.close()
     # Clear last line and print completion message.
-    print("                                                                      ", end="\r")
+    print("                                                                      ")
     print("Transfer complete.")
-
+'''
     # ------- two way handshake ---------
     # ends the connection with a two-way handshake
     # Create FIN packet and sends to server
@@ -638,7 +654,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
         print("Error closing connection from client")
 
     # ----- slutten på two way handshake -------
-
+'''
 # Packs file metadata. Used in client to tell server how to name the file and how big it is
 def pack_metadata(filename, no_of_packets, filesize):
     return (str(filename) + ":" + str(no_of_packets) + ":" + str(filesize)).encode()
