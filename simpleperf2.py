@@ -51,6 +51,7 @@ def server(ip, port, reliability, testcase, window_size):
     sequence_number = 0
     acknowledgment_number = seq  # Server acknowledges that packet with sequence_nr is received
     flags = 12  # SYN-ACK flags
+
     packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
     server_socket.sendto(packet, client_address)
     print("Sent SYN-ACK to client", end="\r")
@@ -193,6 +194,17 @@ def server(ip, port, reliability, testcase, window_size):
                 ackPakcet = create_packet(seq, expSeqNo, 4, window_size, "".encode())
                 server_socket.sendto(ackPakcet, client_address)
 
+    print("RELIABILITY")
+    print(reliability)
+    if reliability == "SAW":
+        print("Starting SAW")
+        stop_wait()
+    elif reliability == "GBN":
+        print("Starting GBN")
+        gbn()  # Send packet using Go-Back-N protocol
+    elif reliability == "SR":
+        sr(filename)
+
     finalFile = b''
     for i, arrayItem in enumerate(received_data):
         try:
@@ -214,7 +226,7 @@ def server(ip, port, reliability, testcase, window_size):
     # Receive response and parse header from client
     data, null = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
-
+    print(f"Flag: {flags}")
     if flags == 2:  # If FIN packet received
         print("Received FIN from client ")
 
@@ -257,15 +269,19 @@ def client(ip, port, filename, reliability, testcase, window_size):
     packet = header.create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
     start_time = time.time()
     client_socket.sendto(packet, serverAddress)
+    print(f"A SYN-packet has been sent from client to server")
 
     # 2. Receive and parse SYN-ACK from server
     response, null = client_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(response)
+    print(f"SYN-ACK has been received from server")
     if flags == 12:  # If flags == SYN+ACK
         end_time = time.time()
+
         # 3. Client sends final ACK to server
         packet = header.create_packet(sequence_number, ack, 4, window_size, "".encode())
         client_socket.sendto(packet, serverAddress)
+        print(f"Client has sent a final ack and is connecting")
 
     #######
     # Set timeout using measured RTT
@@ -610,7 +626,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # Receive response and parse header
     response, null = client_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(response)
-    print("FLAGS" + str(flags))
 
     # Recives ACK for the FIN and closes connection
     if flags == 6: # If flags == ACK

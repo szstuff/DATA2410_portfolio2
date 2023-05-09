@@ -1,0 +1,189 @@
+Data2500 – Oblig 3
+
+Stilian Todorov Zagorov – s364531
+Jovia Namayanja Kaggwa – s364526
+Saloni Arora Chitkara – s364538
+Ngoc Linn Vu Huynh - s364523
+Table of Contents
+Uke 11	1
+Uke 12	3
+Uke 13	6
+
+Uke 11
+11.1)
+Se på CPU-usage på en Linux-VM. Hvor mye av CPU'en brukes vanligvis? Her ser det ut til å være mye ressurser til overs. Hvordan kan de utnyttes bedre, eller gjør de allerede det?
+
+Ut ifra bildet brukes nesten ikke CPU-en i det hele tatt.
+11.4)
+Linux-kjernen konfigurerer vanligvis hardware-timeren til å sende et interrupt hvert hundredels sekund.
+Forklar kort hvorfor dette timer-interruptet er nødvendig for at Linux-kjernen skal kunne fordele CPU-tid mellom alle prosessene uten at en av disse prosessene kan ta over styringen.
+Timer-interruptet er nødvendig i og med at den får kjernen til å bytte imellom forskjellige prosesser og fordeler CPU-tiden på en slik måte at ingen enkelt prosess dominerer ressursene på systemet. Uten timer-interrupt ville en enkel prosess kunne ta over CPU-en og forhindre andre prosesser fra å bli fullført.
+11.6)
+Problem 1.15 i Tanenbaum: Hva er den viktigste forskjellen mellom en trap og et interrupt?
+(I simuleringen som demonstrerer multitasking av forelesning og vaffelrørelaging, forskjellen på når vaffelprosessen ønsket å knuse et egg og på avbruddene fra timeren og fra melkemannen når melken leveres)
+Forskjellen mellom trap og interrupt er hvordan disse hendelsene oppstår.
+Et Interrupt vil oppstå som et signal fra en ekstern enhet. I eksemplet vaffelrørelagingen vil melkemannen være et eksempel på den eksterne enheten som krever maskinens oppmerksomhet. Kontrollen vil overføres til en interrupt handler som vil sikre at følgende oppgave blir utført slik at signalet blir håndtert.
+Når en trap oppstår vil programmet blit stanset og kontrollen vil overføres til operativsystemet. Det er også den vanlige måten å gjøre et systemkall fordi de kjører med høyere prioritet enn brukerkode.
+11.8)
+Tre 100% CPU-avhengige prosesser A, B og C kjører på en Linux-PC med kun én CPU og med en Linux 2.6 kjerne. Ved starten av en epoke er alle tre klare til å kjøre og de er de eneste prosessene i ready-list. Prosess A har en tildelt timeslice på 30 ticks/jiffies, B har 20 og C har 10.
+Forklar kort hvordan disse prosessene kjøres og hvordan fordelingen av CPU-tid vil skje for disse tre prosessene i løpet av epoken. Anta at det ikke forekommer andre interrupts enn fra timeren og at prosessene ikke gjør noen systemkall.
+Hvis det er kun en CPU tilgjengelig og ingen interrupts unntak timeren vil kun en prosess kjøres om gangen hvor tidsfordelingen vil skje i henhold til den tildelte timeslice. A vil benytte 30 jiffies, B 20 jiffies og C 10 jiffies. Prosessene vil kjøre frem til deres tildelte timeslice går ut etter dette vil de gå tilbake til ready-listen og vente på deres neste tildeling.
+11.9)
+Forklar kort hvor mange timer-interrupts og context switches som vil skje i denne epoken.
+Hvis vi legger sammen prosess A, B og C får vi 60 jiffies. Jiffy-lengden ligger på 10 ms som betyr at den totale CPU-tiden tilgjengelig i løpet av epoken vil da ligge på 600 ms. Vi vet at timer-interrupts skjer hver 1/100 sekund, dermed får vi regnestykke 600 * 1/100 som gir oss 6 timer-interrupts i løpet av denne epoken.
+Når det kommer til context switches er det avhengig av hvordan prosess A, B og C bruker sin tildelte CPU-tid. Hvis CPU-tiden blir brukt opp før epoken går ut vil det ikke være nødvendig med context switch, men hvis vi antar at en eller flere av disse prosessene ikke bruker opp sin tildelte tid før epoken er over vil det oppstå en context switch til en annen prosess som står klart. Dermed vil det variere.
+11.10)
+Hva skjer når epoken er over? Vil prosessene nødvendigvis få tildelt samme antall ticks som før? Forklar kort.
+Når en epoke er over vil det bli beregnet og satt opp en ny timeslice verdi for hvert av prosessene. Tildelingen av timeslice vil være basert på prioriteten til prosessene og deres bruk av CPU-tid tidligere. Dermed vil den tildelt ticks/jiffies ikke være det samme som før nødvendigvis. Endringer av prioritet kan også være en faktor som spiller inn i tildelingen.
+11.14)
+Lag et script som først stopper alle kjørende docker containere og deretter fjerner dem og alle image.
+Det er viktig at dere jevnlig fjerne gamle containere og image som ikke er i bruk siden serveren har lite diskplass og risikerer å bli helt full om man ikke rydder jevnlig.
+
+11.15)
+I denne oppgaven skal du på samme måte som i oppgaven fra forrige uke lage to docker containere som kjører en apache2 webserver på port 8081 og 8082 på Linux VM.
+Denne gangen skal du først lage en Dockerfile som sørger for at apache2 installeres på et ubuntu-image og bygge image'et med denne.
+Prøv å få til at apache2 automatisk starter når containeren startes opp, slik at du ikke trenger å gå inn og eksplisitt starter den.
+Lag en index.html-fil som inneholder 'hei fra dockerfile' eller lignende. Når image bygges skal denne filen legges i /var/www/html i docker-imaget.
+Legges denne filen inn når image'et bygges eller når containeren starter?
+
+11.17 – Eficode
+Vi holdt på med denne oppgaven fredag 21.04 pga. Orakel. Intel-serveren var nede den dagen og vi fikk derfor ikke gjort oppgaven. Vi har sendt en mail om det til foreleser.
+
+Uke 12
+12.2)
+Det er 386 syscalls i /usr/src/linux-source-5.10/arch/x86/entry/syscalls/syscall_64.tbl
+
+Ifølge en kommentar I koden brukes entry_64.S til å håndtere systemkall og feil i lavnivå-rutiner. Koden er skrevet i assembly.
+12.4)
+Prosessene deler tilnærmet likt på CPU-tiden. På data2500@cs.oslomet.no-serveren får de ca. 100% hver ettersom brukeren hadde 4 kjerner tildelt.
+
+Dersom flere instanser kjøres enn det er CPU’er tilgjengelig vil disse dele på 400% av CPU-tid slik at alle får omtrent like mye CPU-tid.
+
+
+Nice verdien til både regn programmene ble endret til 19, tallene er fortsatt samme som da Nice = 0. Dette kan være fordi programmene kjører på forskjellige CPU-er, så disse trenger ikke å bli prioritert.
+12.5)
+Start to regne-jobber på din Linux-VM med følgende kommandoer:
+group70@os70:~$ taskset -c 0 ./regn&
+group70@os70:~$ taskset -c 0 ./regn&
+
+Forklar hva taskset gjør med prosessene. Sjekk gjerne at det stemmer ved å kjøre top, taste f, gå med piltaster ned til P = Last Used Cpu, taste space og så Esc. Hvor stor andel CPU-tid får de nå hver?
+Den ene får 12.3%, mens den andre får 12.6% CPU-tid.
+Stopp så regn-jobbene og start to nye med
+group70@os70:~$ killall regn
+group70@os70:~$ taskset -c 0 ./regn&
+group70@os70:~$ taskset -c 0 nice -n 19 ./regn&
+
+Hvor stor andel CPU-tid får de nå hver?
+Etter å endre på nice verdien til det ene programmet så får jeg 14.3% på det ene programmet, og 0.3% på den med Nice verdi 19. Dette kan være pga. de deler samme CPU, i motsetning til forrige oppgaven.
+
+
+12.8)
+
+12.10)
+Container er laget
+
+12.11)
+
+Språk	TIMES uten endringer	CPU-tid uten endringer	TIMES etter endring 	CPU-tid etter TIMES endret
+Bash	1	2.7	1	2.7
+C, ikke optimalisert	4100	5.8	1909	2.8
+C, optimalisert	28000	39.7	1904	2.7
+Java	20000	4.9	11020	2.7
+Python	44	7.2	20	2.8
+PHP	400	6.5	166	2.7
+
+TIMES over årene:
+
+Språk	2010	2019	2023
+PHP	21	155	166
+Java	13.500	15.000	11.020
+C	63.000	4200	1909
+Python		46	20
+
+
+12.14 – Eficode
+Vi holdt på med denne oppgaven fredag 21.04 pga. Orakel. Intel-serveren var nede den dagen og vi fikk derfor ikke gjort oppgaven. Vi har sendt en mail om det til foreleser.
+Uke 13
+13.1)
+Ta utgangspunkt i følgende C-program:
+#include <stdio.h>
+main()
+{
+    printf("c: Hello world!\n");
+}
+Skriv dette inn i en fil hello.c på data2500 eller os-VM ved å starte f. eks. editoren jed:
+$ jed hello.c
+lagre filen og kompiler den med
+$ gcc hello.c
+gcc er C-kompilatoren. For å kunne kompilere og kjøre C-programmet, må gcc være installert, slik den er på data2500 og os-VM. Den lager nå maskinkode som lagres i den kjørbare filen a.out. For å få lov til å kjøre den, må filen gis kjørerettigheter og det gjør du med kommandoen
+$ chmod 700 a.out
+Kjør programmet med
+$ a.out
+og du bør nå få ut "Hello world" i terminalvinduet.
+
+Kan du se på den kjørbare og finne ut noe om hvilket operativsystem koden er kompilert for?
+
+
+Den kjørbare koden er kompilert for Linux. C er ikke plattformuavhengig og samme a.out fil kan ikke kjøres på alle de tre plattformene fordi den har annerledes operativsystem og et annet instruksjonssett.
+
+Logg så inn på en Windows maskin. Kopier a.out med Winscp eller på annen måte, og kjør det fra der du har lagt det med
+C:\>a.out
+Forklar hva som skjer. Hvordan kan du få til å kjøre hello.c på Windows?
+
+Koden er kompilert for Linux og kan derfor ikke kjøres på Windows. I tillegg er C ikke et plattformuavhengig språk, og det samme "a.out"-formatet kan ikke kjøres på ulikt operativsystem.
+cp a.out a.exe
+
+for å kunne kjøre c filen på windows må den kompileres, windows kan ikke kjøre a.out, men a.exe.
+Kan du se på den kjørbare og finne ut noe om hvilket operativsystem koden er kompilert for?
+
+Filen er kompilert for 64-bit Linux.
+
+13.2)
+Linux:
+
+Windows:
+
+Den kjører ikke på min maskin pga. jeg har eldre versjon av Java.
+I teorien skal det være mulig å kjøre java-klasser på alle OS så lenge de har Java/JVM
+13.4)
+2 Tråder:
+Trådene fordeler CPU-tiden likt, altså hver tråd får ca. 50%.
+
+
+3 Tråder:
+
+
+Trådene fordeler fortsatt CPU-tiden likt, slik at hver tråd får ca. 33% CPU.
+Når java-koden kjøres, er det 2 java-tråder i top. Det er også flere andre tråder som virker å være tilknyttet dette (eks.
+13.5)
+
+Før endringer av koden
+
+Endrer work-koden til å få tråd 2 til å også gjøre arbeid
+
+Etter endringer i koden
+13.7)
+Fordi hver tråd har egen stakk og Program Counter, da blir de også listet som «Per thread item». Stakk og Program Counter forklarer hvordan tråden fungerer. Endringer på disse påvirker kun den tråden de er knyttet til.
+Mens globale variablene, åpne filer og child prosesser forklarer hele prosessen, dermed blir de listet som «Per process item». Endringer på disse variablene påvirker hele prosessen.
+13.10)
+I et stystem med threads så er det en stack per thread når user-level threads blir brukt. Ved å ha stack per thread så kan hver tråd utføre egne funksjonskall uten å påvirke resten av trådene i prosessen.
+Kernel-level threads brukes i noen systemer, der trådene administreres av OS-kjernen, siden det trenges mer systemressurser.
+Både user- og kernel-level threads har sin egen stakk, siden hver tråd må lagre lokale variabler og funksjonskall uavhengig av andre tråder i prosessen.
+13.12)
+Lag på Linux-VM en docker-compose.yaml fil som starter opp to nginx-containere web1 og web2 som begge kjører nginx-webserver på port 80 og som gir to små men forskjellige index.html filer fra mapper på host'en som containerene kjører på. Innholdet kan være navnet på webserveren, slik at man kan se forskjell.
+
+Neste steg er å legge til en container som kan kalles loadbalancer i docker-compose.yaml. Lag først en mappe nginx som inneholder følgende fil med navn default.conf
+
+Lag i nginx-mappen en Dockerfile som laster inn nginx og så kopierer filen default.conf til /etc/nginx/conf.d/default.conf på loadbalancer-containeren.
+
+Legg så til kode i docker-compose.yaml som gjør at loadbalancer bygges slik at den tar imot trafikk inn til Linux-VM inn på sin port 80.
+
+Bygg så hele systemet og sjekk at loadbalancer virker som den skal. Opsjonen --build gjør at det alltid bygges på nytt fra Dockerfile om det har blitt gjort noen endringer. Linux-VM kan det se omtrent slik ut:
+
+13.13 – Eficode
+
+
+S364523-s167: qzSMYA1CRO
+S364538-s53: VOHqrJcK0
+s364526-s8: dHm2f4KEJV
+S364531-s260: vwcCbNP8Bx
