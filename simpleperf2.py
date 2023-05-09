@@ -222,7 +222,8 @@ def server(ip, port, reliability, testcase, window_size):
         except Exception as e:
             print("Could not add file with index " + str(i) + " to working file. e: " + str(e))
     filename = filename.replace('\0', '')
-    f = open((f'received_{str(filename)}'), "wb")
+    f = open("RECEIVED.TXT", "wb")
+    # f = open((f'received_{str(filename)}'), "wb")
     f.write(finalFile)
     f.close()
 
@@ -238,6 +239,7 @@ def server(ip, port, reliability, testcase, window_size):
     data, null = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
     print(f"Flag: {flags}")
+
     if flags == 2:  # If FIN packet received
         print("Received FIN from client ")
 
@@ -249,7 +251,8 @@ def server(ip, port, reliability, testcase, window_size):
         packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
         server_socket.sendto(packet, client_address)
 
-        print("ACK has been sent to server, connection is closing")
+        print(f"Inn i if statment. Flag: {flags}")
+        print("ACK has been sent to client, connection is closing")
         server_socket.close()
     else:
         print("Error closing connection from server")
@@ -644,6 +647,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # Receive response and parse header
     response, null = client_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(response)
+    print(f"Flag i client for å check FIN ACK: {flags}")
 
     # Recives ACK for the FIN and closes connection
     if flags == 6: # If flags == ACK
