@@ -99,6 +99,7 @@ def server(ip, port, reliability, testcase, window_size):
     print("Out of metadata")
 
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
+    # GBN sends packets, and if it loses one of the packets it will delete the packets and send again
     # for ACK of the previous packet.
     def gbn():
         i = 0   # i represents the index that the received packet is supposed to go into in received_data
