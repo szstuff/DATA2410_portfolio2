@@ -169,42 +169,6 @@ def server(ip, port, reliability, testcase, window_size):
             except Exception as e:
                 print(f"Exception occurred: {e}")
 
-    def sr(filename):
-        expSeqNo = 0  # Expected seq number in order to keep track
-
-        while True:
-            # Receive packet from sender
-            packet, address = client_address.recvfrom(1472)
-            # Extract packet header
-            seq, ack, flags, win = parse_header(packet)
-            # Check if packet is the expected one
-            if seq == expSeqNo:
-                data = packet[12:]
-                print(f" {data}, \nReceived the expected packet")
-
-                # Sends ACK packet to receiver
-                ackPakcet = create_packet(seq, seq, 4, window_size, "".encode())
-                server_socket.sendto(ackPakcet, client_address)
-
-                # Update the expected sequence number and the received packets
-                expSeqNo += 1
-                received_data[seq] = packet
-
-                # Checks if there is any buffered packets that can be added to file
-                while expSeqNo in received_data:
-                    data = received_data[expSeqNo][12:]
-                    print(f' {data}, \nchecking data')
-
-                    # Remove packet from received dictionary
-                    del received_data[expSeqNo]
-
-                    # Update expected sequence number
-                    expSeqNo += 1
-            else:
-                # Packet has been sent out of order, sends a new ACK for previous packet
-                ackPakcet = create_packet(seq, expSeqNo, 4, window_size, "".encode())
-                server_socket.sendto(ackPakcet, client_address)
-
     print("RELIABILITY")
     print(reliability)
     if reliability == "SAW":
@@ -214,7 +178,7 @@ def server(ip, port, reliability, testcase, window_size):
         print("Starting GBN")
         gbn()  # Send packet using Go-Back-N protocol
     elif reliability == "SR":
-        sr(filename)
+        sr()
 
     finalFile = b''
     for i, arrayItem in enumerate(received_data):
@@ -438,8 +402,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         print("Issue when sending packet using GBN: " + str(e))
                         j = i
             i += window_size
-
-    def ny_ny_sr(serverAddress):
+    def sr():
         i = 0
         while i <= no_of_packets - 1:
             failed_packets = []
@@ -510,53 +473,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # If no ack received, it waits for timeout, and tries to send the packet again.
 
     # SR: Du får ack etter hver eneste pakke.
-
-    # -------- koder ny def sr -----------
-    def sr(serverAddress):
-        i = 0
-        while i <= no_of_packets - 1:
-            done = False
-            scope = i + window_size
-            if i + window_size >= no_of_packets:
-                scope = no_of_packets - 1
-            packets_sent = []
-            while not done:
-                j = i
-                while j <= scope:
-                    if j > no_of_packets - 1:
-                        print("Outside of split_file index")
-                        break
-                    if j not in packets_sent:
-                        data = split_file[j]
-                        packet = create_packet(j, 0, 0, window_size, data)
-                        try:
-                            client_socket.sendto(packet, serverAddress)
-                            print(f"Sent packet with sequence number: {j}")
-                            packets_sent.append(j)
-                        except Exception as e:
-                            print("Issue when sending packet using SR: " + str(e))
-                    j += 1
-                try:
-                    client_socket.settimeout(0.5)  # set a timeout for receiving ACKs
-                    while True:
-                        response, null = client_socket.recvfrom(1472)
-                        seq, ack, flags, win = parse_header(response)
-                        if flags == 4 and ack in packets_sent:
-                            print(f"Received ACK for packet with sequence number: {ack}")
-                            packets_sent.remove(ack)
-                            if not packets_sent:
-                                done = True
-                except socket.timeout:
-                    # no ACK received within timeout, retransmit unacknowledged packets
-                    for packet_number in packets_sent:
-                        data = split_file[packet_number]
-                        packet = create_packet(packet_number, 0, 0, window_size, data)
-                        try:
-                            client_socket.sendto(packet, serverAddress)
-                            print(f"Retransmitted packet with sequence number: {packet_number}")
-                        except Exception as e:
-                            print("Issue when sending packet using SR: " + str(e))
-            i += window_size
 
     def hybrid(serverAddress):
         i = 0
