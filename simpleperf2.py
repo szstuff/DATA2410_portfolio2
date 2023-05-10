@@ -60,7 +60,6 @@ def server(ip, port, reliability, testcase, window_size):
     data, client_address = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
     print("Receive final ACK from client")
-    print(data)
 
     if not flags == 4:
         print(str(flags))
@@ -79,15 +78,16 @@ def server(ip, port, reliability, testcase, window_size):
     ########
     while True:
         try:
-            metadata, client_address = server_socket.recvfrom(1472)
-            print("Receive metadata")
-            print(metadata)
-            filename, no_of_packets, expectedFilesize = unpack_metadata(metadata)
-            no_of_packets = int(no_of_packets)
-            expectedFilesize = int(expectedFilesize)
+            metadata, client_address = server_socket.recvfrom(1472) # Wait for packet to arrive
+            print("Receive metadata") # Print 'Receive metadata'
+            print(metadata) # Print actual metadata
+            filename, no_of_packets, expectedFilesize = unpack_metadata(metadata) # Extract metadata from received packet
+            no_of_packets = int(no_of_packets) # Convert no_of_packets into int
+            print("no_of_packets: " + str(no_of_packets) +". Filesize: " + str(expectedFilesize))
+            expectedFilesize = int(expectedFilesize) # Convert expectedFilesize into int
             sequence_number = 0
             acknowledgment_number = 0
-            received_data = [None] * no_of_packets
+            received_data = [None] * (no_of_packets)
 
             response = create_packet(0, 0, 4, window_size, "".encode())
             server_socket.sendto(response, client_address)
@@ -98,59 +98,126 @@ def server(ip, port, reliability, testcase, window_size):
 
     print("Out of metadata")
 
-    # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
-    # GBN sends packets, and if it loses one of the packets it will delete the packets and send again
-    # for ACK of the previous packet.
-    def gbn():
-        i = 0   # i represents the index that the received packet is supposed to go into in received_data
-        while i < no_of_packets: # Runs until every packet from 0 to no_of_packets are received
-            done = False
-            scope = i + window_size #Scope of window. Used to only receive data from 0 to window_size
-            #If the window_size is greater than the remaining amount of packets, set scope to the last index of no_of_packets
-            if (scope >= no_of_packets):
-                scope = no_of_packets - 1
-
-            while not done: # Used to repeat code until the all the data in the current window has been received succsessfully
-                j = i       # Like i, j represents the index of received_data that the server expects to receive.
-                while j <= scope: #
-                    try:
-                        # Receive packet
-                        packet, client_address = server_socket.recvfrom(1472)
-                        print("GBN")
-                        print(packet)
-                        seq, ack, flags, win = parse_header(packet)
-                        data = packet[12:]
-                        if not j == seq:
-                            print("Unexpected sequence number: " + str(seq) + ". j: " + str(j))
-                            j = i
-                            break
-                        received_data[seq] = data
-                        response = create_packet(seq, seq, 4, window_size, "".encode())
-                        server_socket.sendto(response, client_address)
-                        print(f"Received index " + str(seq))
-
-                        if j == scope:
-                            done = True
-                        j += 1
-
-                    except Exception as e:
-                        print("Exception when receiving data with GBN: " + str(e))
-                        j = i
-            i += window_size
-
-    def sr():
+    ###GAMMEL/FEIL VERSJON
+    def nyGBN():
+        testcaseNotRun = True
+        # Loop through every packet that is received
         for i in range(no_of_packets):
+            print("I: " +str(i))
             try:
+                # Receive packet
                 packet, client_address = server_socket.recvfrom(1472)
                 seq, ack, flags, win = parse_header(packet)
                 data = packet[12:]
-                if seq == i:
-                    print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
-                    received_data[seq] = data
-                    response = create_packet(seq, seq, 4, window_size, "".encode())
-                    server_socket.sendto(response, client_address)
+                print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
+
+                # Add the data to the file at its correct index
+                received_data[seq] = data
+
+                print("SJEKK TESTCASE:")
+                print("testcasei: " + str(i) + " testcaseNotrun: " + str(testcaseNotRun) + "testcase: " + str(testcase))
+
+                # If the testcase is set to SKIP_ACL and has not been ran yet, skip sending the ACK for the next packet
+                if i == 3 and testcaseNotRun and testcase == "SKIP_ACK":
+                    testcaseNotRun = False
+                    print("TESTCASE AKTIV")
+                    continue
+                print("ETTER TESTCASE I: " + str(i))
+
+                # Send an ACK for the received packet
+                response = create_packet(seq, seq, 4, window_size, "".encode())
+                server_socket.sendto(response, client_address)
             except Exception as e:
                 print(f"Exception occurred: {e}")
+
+        # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
+        # for ACK of the previous packet.
+
+    ###GAMMEL/FEIL VERSJON
+    def gammel_gbn():
+            i = 0   # i represents the index that the received packet is supposed to go into in received_data
+            while i < no_of_packets: # Runs until every packet from 0 to no_of_packets are received
+                done = False
+                scope = i + window_size #Scope of window. Used to only receive data from 0 to window_size
+                #If the window_size is greater than the remaining amount of packets, set scope to the last index of no_of_packets
+                if (scope >= no_of_packets):
+                    scope = no_of_packets - 1
+
+                while not done: # Used to repeat code until the all the data in the current window has been received succsessfully
+                    j = i       # Like i, j represents the index of received_data that the server expects to receive.
+                    while j <= scope:
+                        try:
+                            # Receive packet
+                            packet, client_address = server_socket.recvfrom(1472)
+                            print("GBN")
+                            print(packet)
+                            seq, ack, flags, win = parse_header(packet)
+                            data = packet[12:]
+                            # Check if received packet is the expected one
+                            if not j == seq:
+                                print("Unexpected sequence number: " + str(seq) + ". j: " + str(j))
+                                j = i
+                                break
+                            # If the packet is the expected one, add it to the received_data list
+                            received_data[seq] = data
+
+                            print("SJEKK TESTCASE:")
+                            print("testcasei: " + str(i) + " testcaseNotrun: " + str(testcaseNotRun) + "testcase: " + str(testcase))
+
+                            # If the testcase is set to SKIP_ACL and has not been ran yet, skip sending the ACK for the next packet
+                            if i == 3 and testcaseNotRun and testcase == "SKIP_ACK":
+                                testcaseNotRun = False
+                                print("TESTCASE AKTIV")
+                                continue
+                            print("ETTER TESTCASE I: " + str(i))
+
+                            response = create_packet(seq, seq, 4, window_size, "".encode())
+                            server_socket.sendto(response, client_address)
+                            print(f"Received index " + str(seq))
+
+                            # Check if current window is done
+                            if j == scope:
+                                done = True
+                            j += 1
+
+                        except Exception as e:
+                            print("Exception when receiving data with GBN: " + str(e))
+                            j = i
+                i += window_size
+
+    ###GAMMEL/FEIL VERSJON
+    def sr():
+        testcaseNotRun = True
+        # Loop through every packet that is received
+        for i in range(no_of_packets):
+            print("I: " +str(i))
+            try:
+                # Receive packet
+                packet, client_address = server_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(packet)
+                data = packet[12:]
+                print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
+
+                # Add the data to the file at its correct index
+                received_data[seq] = data
+
+                print("SJEKK TESTCASE:")
+                print("testcasei: " + str(i) + " testcaseNotrun: " + str(testcaseNotRun) + "testcase: " + str(testcase))
+
+                # If the testcase is set to SKIP_ACL and has not been ran yet, skip sending the ACK for the next packet
+                if i == 3 and testcaseNotRun and testcase == "SKIP_ACK":
+                    testcaseNotRun = False
+                    print("TESTCASE AKTIV")
+                    continue
+                print("ETTER TESTCASE I: " + str(i))
+
+                # Send an ACK for the received packet
+                response = create_packet(seq, seq, 4, window_size, "".encode())
+                server_socket.sendto(response, client_address)
+            except Exception as e:
+                print(f"Exception occurred: {e}")
+
+
 
     def stop_wait():
         print("I SAW")
@@ -180,8 +247,13 @@ def server(ip, port, reliability, testcase, window_size):
     elif reliability == "SR":
         sr()
 
-    finalFile = b''
+    finalFile = b'' # Empty bytes object to hold joined file data
+    print("LAGRER FIL")
+    
+    # Iterate through received_data array and add packets to finalFile
     for i, arrayItem in enumerate(received_data):
+        print("i: " + str(i))
+        print("data:" +str(arrayItem))
         try:
             finalFile += arrayItem
         except Exception as e:
@@ -290,6 +362,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
             split_file.append(file_data[index:index + packetsize])
 
         no_of_packets = len(split_file)
+        print("no_of_packets: " +str(no_of_packets))
 
         # Print file information
         # print("Opened file: " + str(filename))  # Print name of the opened file
@@ -358,13 +431,14 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
+    ###GAMMEL/FEIL VERSJON
     def gbn(serverAddress):
         i = 0
         # for i in range (0, no_of_packets-1, window_size):
         while i <= no_of_packets - 1:
             done = False  # Used to run until all packets are sent
             scope = i + window_size
-            if i + window_size >= no_of_packets:
+            if scope >= no_of_packets:
                 scope = no_of_packets - 1
             while not done:
                 j = i
@@ -402,21 +476,31 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         print("Issue when sending packet using GBN: " + str(e))
                         j = i
             i += window_size
+
+### ENDRE DENNE!!!
+### Må endres til at det blir sliding window
     def sr():
+        print("I SR BRRRRRRRRRR")
         i = 0
+        received_acks = [False]*no_of_packets
         while i <= no_of_packets - 1:
-            failed_packets = []
+            print("i" +str(i))
+            print(no_of_packets)
             scope = i + window_size
             if scope >= no_of_packets:
                 scope = no_of_packets - 1
             j = i
+            print("J:" +str(j) + ", I:" +str(i))
             while j <= scope:
-                if j > no_of_packets - 1:
-                    print("Outside of split_file index")
-                    break
+                print(received_acks)
                 data = split_file[j]
+                print("DATA WITH j:" + str(j))
+                print(data[1400:])
                 packet = create_packet(j, 0, 0, window_size, data)
                 try:
+                    if received_acks[j] == True:
+                        j += 1
+                        continue
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
                     print(f"Sent packet with sequence number: {j}")
@@ -429,44 +513,71 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     if flags == 4 and ack == j:  # If flags = ACK and ack is equal to seq
                         # print(f"Received ACK for packet with sequence number: {i+offset}")
                         print(f"Received ACK for packet with sequence number: {ack}")
+                        received_acks[seq] = True
                         j += 1
-                        if j == no_of_packets - 1 or j == i + window_size:
+                        if j == no_of_packets or j == i + window_size:
+                            print ("BROKE OUT OF IPAIJEFOAIHEF<3")
                             break
-                    elif not ack == j:
-                        print("Received unexpected ack: " + str(ack) + ". j: " + str(j))
-                    else:
-                        print(f"Received unexpected response with sequence number: {ack}")
+
+                    if j == scope:
+                        for index in range (i, scope):
+                            if received_acks[index] == False:
+                                j = index
+                                continue
 
                 except Exception as e:
                     print("Issue when sending packet using SR: " + str(e))
-                    failed_packets.append(j) # Stores the index of the packet that was not sent successfully
-                    j = i
+                    #j = i
+                    break
+            i += window_size
 
-                while len(failed_packets) > 0:
-                    print("Resending failed packet i: " +str(failed_packets[0]))
-                    j = failed_packets[0]
-                    data = split_file[j]
-                    packet = create_packet(j, 0, 0, window_size, data)
-                    try:
-                        # Send packet to receiver
-                        client_socket.sendto(packet, serverAddress)
-                        print(f"Sent packet with sequence number: {j}")
+    ###GAMMEL/FEIL VERSJON
+    def gbnNy():
+        print("I GBN BRRRRRRRRRR")
+        i = 0
+        received_acks = [False]*no_of_packets
+        while i <= no_of_packets - 1:
+            print("i" +str(i))
+            print(no_of_packets)
+            scope = i + window_size
+            if scope >= no_of_packets:
+                scope = no_of_packets - 1
+            j = i
+            print("J:" +str(j) + ", I:" +str(i))
+            while j <= scope:
+                print(received_acks)
+                data = split_file[j]
+                print("DATA WITH j:" + str(j))
+                print(data[1400:])
+                packet = create_packet(j, 0, 0, window_size, data)
+                try:
+                    if received_acks[j] == True:
+                        j += 1
+                        continue
+                    # Send packet to receiver
+                    client_socket.sendto(packet, serverAddress)
+                    print(f"Sent packet with sequence number: {j}")
 
-                        # Receive ACK
-                        response, null = client_socket.recvfrom(1472)
-                        seq, ack, flags, win = parse_header(response)
-                        # Check if received ACK is for the expected sequence number
-                        if flags == 4 and ack == j:  # If flags = ACK and ack is equal to seq
-                            print(f"Received ACK for packet with sequence number: {ack}")
+                    # Receive ACK
+                    response, null = client_socket.recvfrom(1472)
+                    seq, ack, flags, win = parse_header(response)
+                    # Check if received ACK is for the expected sequence number
+                    # if flags == 4 and ack == i+offset: #If flags = ACK and ack is equal to seq
+                    if flags == 4 and ack == j:  # If flags = ACK and ack is equal to seq
+                        # print(f"Received ACK for packet with sequence number: {i+offset}")
+                        print(f"Received ACK for packet with sequence number: {ack}")
+                        received_acks[seq] = True
+                        j += 1
+                        if j == no_of_packets or j == i + window_size:
+                            print ("BROKE OUT OF IPAIJEFOAIHEF<3")
+                            break
+                    else:
+                        j = i
 
-                        elif not ack == j:
-                            print("Received unexpected ack: " + str(ack) + ". j: " + str(j))
-                        else:
-                            print(f"Received unexpected response with sequence number: {ack}")
-                        failed_packets.pop(0)
-                    except Exception as e:
-                        print("Exception: " +str(e))
-
+                except Exception as e:
+                    print("Issue when sending packet using SR: " + str(e))
+                    #j = i
+                    break
             i += window_size
 
     # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
@@ -474,66 +585,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
     # SR: Du får ack etter hver eneste pakke.
 
-    def hybrid(serverAddress):
-        i = 0
-        while i <= no_of_packets - 1:
-            done = False
-            scope = i + window_size
-            if i + window_size >= no_of_packets:
-                scope = no_of_packets - 1
-            packets_sent = []
-            while not done:
-                j = i
-                while j <= scope:
-                    if j > no_of_packets - 1:
-                        print("Outside of split_file index")
-                        break
-                    if j not in packets_sent:
-                        data = split_file[j]
-                        packet = create_packet(j, 0, 0, window_size, data)
-                        try:
-                            client_socket.sendto(packet, serverAddress)
-                            print(f"Sent packet with sequence number: {j}")
-                            packets_sent.append(j)
-                        except Exception as e:
-                            print("Issue when sending packet using hybrid method: " + str(e))
-                    j += 1
-                try:
-                    client_socket.settimeout(0.5) # set a timeout for receiving ACKs
-                    while True:
-                        response, null = client_socket.recvfrom(1472)
-                        seq, ack, flags, win = parse_header(response)
-                        if flags == 4 and ack in packets_sent:
-                            print(f"Received ACK for packet with sequence number: {ack}")
-                            packets_sent.remove(ack)
-                            if not packets_sent:
-                                done = True
-                except socket.timeout:
-                    # no ACK received within timeout, switch to GBN
-                    for packet_number in packets_sent:
-                        data = split_file[packet_number]
-                        packet = create_packet(packet_number, 0, 0, window_size, data)
-                        try:
-                            client_socket.sendto(packet, serverAddress)
-                            print(f"Retransmitted packet with sequence number: {packet_number} using GBN")
-                        except Exception as e:
-                            print("Issue when sending packet using hybrid method: " + str(e))
-                    # wait for GBN to complete transmission
-                    try:
-                        while True:
-                            response, null = client_socket.recvfrom(1472)
-                            seq, ack, flags, win = parse_header(response)
-                            if flags == 4 and ack in packets_sent:
-                                print(f"Received ACK for packet with sequence number: {ack} using GBN")
-                                packets_sent.remove(ack)
-                                if not packets_sent:
-                                    done = True
-                            elif not ack in packets_sent:
-                                print(f"Received unexpected ACK with sequence number: {ack} using GBN")
-                    except socket.timeout:
-                        # no more ACKs received, switch back to SR
-                        break
-            i += window_size
 
 
     # Send file with chosen reliability protocol
@@ -640,20 +691,17 @@ def checkReliability(val):
         return "SR"
     else:
         raise Exception(
-            "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(
-                val))
+            "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(val))
 
 
 def checkTestCase(val):
     val = val.upper()
     if val is None:
         return None
-    elif val == "SKIP_ACK" or val == "SKIPACK":
+    elif val == "SKIP_ACK" or val == "SKIPACK" or val == "LOSS":
         return "SKIP_ACK"
     elif val == "SKIP_SEQ" or val == "SKIPSEQ":
         return "SKIP_SEQ"
-    elif val == "LOSS":
-        return "LOSS"
     else:
         raise Exception(
             "Could not parse -t testcase input. Expected: \"SKIP_ACK\", \"SKIP_SEQ\" or \"LOSS\", Actual: " + str(val))
@@ -667,26 +715,37 @@ def checkWindow(val):
         return val
 
 
-parser = argparse.ArgumentParser(description="positional arguments",
-                                 epilog="end of help")  # Initialises argsparse parser
-
+parser = argparse.ArgumentParser(description="positional arguments",epilog="end of help")  # Initialises argsparse parser
 # Arguments
 parser.add_argument('-s', '--server', action='store_true', default=False, help="Start in server mode. Default.")
 parser.add_argument('-c', '--client', action='store_true', default=False, help="Start in client mode")
-parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1")
+parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1", help="Server IP")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
-### FJERN FØR INNLEVERING: index.html. Bytt til None elns
 parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
-parser.add_argument('-r', '--reliable', type=checkReliability, default="SAW", help="Choose reliable method (GBN or SR)")
-parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="XXXX")
-parser.add_argument('-w', '--windowsize', type=checkWindow, default=5, help="XXXX")
+parser.add_argument('-r', '--reliable', type=checkReliability, default="SAW", help="Choose method for transfer (SAW, GBN or SR)")
+parser.add_argument('-t', '--testcase', type=checkTestCase, default=None, help="Simulate loss of packets to test error handling in the code.")
+parser.add_argument('-w', '--windowsize', type=checkWindow, default=5, help="Set the window size for GBN and SR.")
 args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
     print("Starting in server mode")
-    server(args.ip, args.port, args.reliable, None, args.windowsize)
+    server(args.ip, args.port, args.reliable, args.testcase, args.windowsize)
 elif args.client:
     print("Starting in client mode")
-    client(args.ip, args.port, args.file, args.reliable, None, args.windowsize)
+    client(args.ip, args.port, args.file, args.reliable, args.testcase, args.windowsize)
 else:
     print("Could not start the program")
+
+
+'''
+NOTTATER til LAB
+1. RTT. Det settes i topologifilen (felt delay)
+2. Testcase. Det holder å hardkode i 1 skip/1 loss i hver 
+3. Hvilke testcases skal det være? Hva skal de gjøre?
+4. 
+
+HUSK Å FIKSE FØLGENDE FØR INNLEVERING <3:
+1. Når SR kjøres med stor testfil og testcase SKIPACK, det står feilmelding på klient:
+    Error closing connection from client
+2. 
+'''

@@ -48,6 +48,10 @@ def parse_flags(flags):
     fin = flags & (1 << 1)
     return syn, ack, fin
 
-
+'''
+# let's look at the last 4 bits:  S A F R
+# 0 0 0 0 represents no flags
+# 0 1 0 0  ack flag set, and the decimal equivalent is 4
+'''
 
 
