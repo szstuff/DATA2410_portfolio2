@@ -42,7 +42,7 @@ def server(ip, port, reliability, testcase, window_size):
     #######
     # 1. Receive and parse SYN from client
     data, client_address = server_socket.recvfrom(1472)
-    seq, ack, flags, win = parse_header(data)
+    seq, ack, flags, win = parse_header(data) # Extract information from received packet
     if not flags == 8:  # If packet is not a SYN packet
         print(str(flags))
         raise Exception("Expected SYN (8) packet. Received: " + str(flags))
@@ -52,16 +52,17 @@ def server(ip, port, reliability, testcase, window_size):
     acknowledgment_number = seq  # Server acknowledges that packet with sequence_nr is received
     flags = 12  # SYN-ACK flags
 
+    # Create packet with header fields
     packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
-    server_socket.sendto(packet, client_address)
+    server_socket.sendto(packet, client_address) # Send packet to client
     print("Sent SYN-ACK to client")
 
     # 3. Receive final ACK from client
-    data, client_address = server_socket.recvfrom(1472)
-    seq, ack, flags, win = parse_header(data)
+    data, client_address = server_socket.recvfrom(1472) # Wait for packet to arrive
+    seq, ack, flags, win = parse_header(data) # Extract header fields from received packet
     print("Receive final ACK from client")
 
-    if not flags == 4:
+    if not flags == 4: # If packet is not an ACK packet
         print(str(flags))
         raise Exception("Expected SYN (8) packet. Received: " + str(flags))
     else:
@@ -89,8 +90,8 @@ def server(ip, port, reliability, testcase, window_size):
             acknowledgment_number = 0
             received_data = [None] * (no_of_packets)
 
-            response = create_packet(0, 0, 4, window_size, "".encode())
-            server_socket.sendto(response, client_address)
+            response = create_packet(0, 0, 4, window_size, "".encode()) # Create ACK packet
+            server_socket.sendto(response, client_address) # Send ACK packet
             print("Sent ACK for metadata")
             break
         except Exception as e:
@@ -221,31 +222,32 @@ def server(ip, port, reliability, testcase, window_size):
 
     def stop_wait():
         print("I SAW")
+        # Iterate through every expected packet
         for i in range(no_of_packets):
             try:
-                packet, client_address = server_socket.recvfrom(1472)
+                packet, client_address = server_socket.recvfrom(1472) # Receive a packet
                 print("SAW")
                 print(packet)
-                seq, ack, flags, win = parse_header(packet)
-                data = packet[12:]
-                if seq == i:
+                seq, ack, flags, win = parse_header(packet) # Parse the header of the packet
+                data = packet[12:] # Extract the data from the packet
+                if seq == i: # If the received sequence number matches the expected sequence number
                     print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
-                    received_data[seq] = data
-                    response = create_packet(seq, seq, 4, window_size, "".encode())
-                    server_socket.sendto(response, client_address)
-            except Exception as e:
+                    received_data[seq] = data # Add the received data to the received_data list
+                    response = create_packet(seq, seq, 4, window_size, "".encode()) # Create an ACK packet
+                    server_socket.sendto(response, client_address) # Send the ACK packet to client
+            except Exception as e: # Handle possible exceptions
                 print(f"Exception occurred: {e}")
 
     print("RELIABILITY")
     print(reliability)
     if reliability == "SAW":
         print("Starting SAW")
-        stop_wait()
+        stop_wait() # Send packet using Stop-And-Wait
     elif reliability == "GBN":
         print("Starting GBN")
         gbn()  # Send packet using Go-Back-N protocol
     elif reliability == "SR":
-        sr()
+        sr() # Send packet using Selective-Repeat
 
     finalFile = b'' # Empty bytes object to hold joined file data
     print("LAGRER FIL")
@@ -258,7 +260,10 @@ def server(ip, port, reliability, testcase, window_size):
             finalFile += arrayItem
         except Exception as e:
             print("Could not add file with index " + str(i) + " to working file. e: " + str(e))
+
+    # Remove any null bytes in the filename
     filename = filename.replace('\0', '')
+    # Save the concatenated file to disk
     f = open("RECEIVED.TXT", "wb")
     # f = open((f'received_{str(filename)}'), "wb")
     f.write(finalFile)
@@ -377,12 +382,17 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
         while True:
             try:
+                # Send the packet to the server
                 client_socket.sendto(packet, serverAddress)
+
+                # Wait for a response from the server
                 response, null = client_socket.recvfrom(1472)
                 print("METADATA")
                 print(response)
+
+                # Parse the response header for ACK and flags
                 seq, ack, flags, win = parse_header(response)
-                if flags == 4 and ack == 0:
+                if flags == 4 and ack == 0: # If the response is an ACK == 0, break the loop
                     print("ACK received for metadata")
                     break
             except Exception as e:
@@ -589,7 +599,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
     # Send file with chosen reliability protocol
     if reliability == "SAW":
-        stop_wait()
+        stop_wait() # Send packet using Stop-And-Wait
     elif reliability == "GBN":
         gbn(serverAddress)  # Send packet using Go-Back-N protocol
     elif reliability == "SR":
@@ -678,7 +688,7 @@ def checkPort(val):  # Checks input of -p port flag
         raise argparse.ArgumentTypeError(str(value) + " is not a valid port")
     return value
 
-
+# Check reliability type from command line argument
 def checkReliability(val):
     val = val.upper()
     if val is None:
@@ -693,7 +703,7 @@ def checkReliability(val):
         raise Exception(
             "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(val))
 
-
+# Check test case type from command line argument
 def checkTestCase(val):
     val = val.upper()
     if val is None:
@@ -706,7 +716,7 @@ def checkTestCase(val):
         raise Exception(
             "Could not parse -t testcase input. Expected: \"SKIP_ACK\", \"SKIP_SEQ\" or \"LOSS\", Actual: " + str(val))
 
-
+# Check windwo size from command line argument
 def checkWindow(val):
     val = int(val)
     if not (1 <= val <= 15):
