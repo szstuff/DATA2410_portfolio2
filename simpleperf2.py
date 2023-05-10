@@ -137,7 +137,7 @@ def server(ip, port, reliability, testcase, window_size):
                         j = i
             i += window_size
 
-    def ny_ny_sr():
+    def sr():
         for i in range(no_of_packets):
             try:
                 packet, client_address = server_socket.recvfrom(1472)
@@ -625,7 +625,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     elif reliability == "GBN":
         gbn(serverAddress)  # Send packet using Go-Back-N protocol
     elif reliability == "SR":
-        sr(serverAddress)  # Send packet using Selective Repeat protocol
+        sr()  # Send packet using Selective Repeat protocol
 
     file.close()
 
