@@ -338,6 +338,8 @@ def client(ip, port, filename, reliability, testcase, window_size):
         packet = header.create_packet(sequence_number, ack, 4, window_size, "".encode())
         client_socket.sendto(packet, serverAddress)
         print(f"Client has sent a final ack and is connecting")
+    else:
+        raise exception ('SYN-ACK packet not received!')
 
     #######
     # Set timeout using measured RTT
