@@ -99,7 +99,7 @@ def server(ip, port, reliability, testcase, window_size):
 
     print("Out of metadata")
 
-    ###GAMMEL/FEIL VERSJON
+    ###NY VERSJON
     def gbn():
         testcaseNotRun = True
         seqNumTracker = 0
@@ -210,21 +210,36 @@ def server(ip, port, reliability, testcase, window_size):
 
     def stop_wait():
         print("I SAW")
+        testcaseNotRun = True
         # Iterate through every expected packet
         i=0
         #for i in range(no_of_packets):
         while i < no_of_packets:
             try:
                 packet, client_address = server_socket.recvfrom(1472) # Receive a packet
+                seq, ack, flags, win = parse_header(packet) # Parse the header of the packet
+
                 print("SAW")
                 print(packet)
-                seq, ack, flags, win = parse_header(packet) # Parse the header of the packet
                 data = packet[12:] # Extract the data from the packet
+                print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
+                received_data[seq] = data # Add the received data to the received_data list
+
+                if not i == seq:
+                    i = seq
+
                 if seq == i: # If the received sequence number matches the expected sequence number
-                    print(f"ADDED DATA TO WORKING FILE IN INDEX " + str(seq))
-                    received_data[seq] = data # Add the received data to the received_data list
-                    response = create_packet(seq, seq, 4, window_size, "".encode()) # Create an ACK packet
-                    server_socket.sendto(response, client_address) # Send the ACK packet to client
+                    if i == 3 and testcaseNotRun and testcase == "SKIP_ACK":
+                        testcaseNotRun = False
+                        print("TESTCASE AKTIV")
+                        i +=1
+                        continue
+
+                    print("ETTER TESTCASE I: " + str(i))
+
+                response = create_packet(seq, seq, 4, window_size, "".encode()) # Create an ACK packet
+                server_socket.sendto(response, client_address) # Send the ACK packet to client
+                i+=1
             except Exception as e: # Handle possible exceptions
                 print(f"Exception occurred: {e}")
 
@@ -436,6 +451,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     ###NY VERSJON
     def gbn(serverAddress):
         print("I GBN BRRRRRRRRRR")
+        testcaseNotRun = True
 
         # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
         base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
