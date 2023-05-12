@@ -393,7 +393,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     try:
                         received_acks[j+1] = False
                     except:
-                        break
+                        pass
                     packet = create_packet(j, 0, 0, window_size, data)
 
                     # Send packet to receiver
@@ -467,7 +467,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         if base == no_of_packets:
                             break
                     else:
-                        return
+                        pass
             except socket.timeout:
                 print("Timeout occurred. Resending packets...")
                 # Vi må finne en måtte å håndtere timeout
