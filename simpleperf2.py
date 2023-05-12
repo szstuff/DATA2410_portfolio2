@@ -484,8 +484,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     if reliability == "SAW":
         stop_wait() # Send packet using Stop-And-Wait
     elif reliability == "GBN":
-        #gbn(serverAddress)  # Send packet using Go-Back-N protocol
-        gbn(serverAddress)
+        gbn(serverAddress)  # Send packet using Go-Back-N protocol
     elif reliability == "SR":
         sr()  # Send packet using Selective Repeat protocol
     transferEndTime = time.time()
