@@ -268,7 +268,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     #######
     timeout_s = end_time - start_time
     client_socket.settimeout(4 * timeout_s)
-    print("##### Timeout set to " + str(round((4 * timeout_s), 2)) + "ms. RTT: " + str(round(timeout_s, 2)) + "ms.")
+    print("##### Timeout set to " + str(round((4 * timeout_s*1000), 2)) + "ms. RTT: " + str(round((timeout_s*1000), 2)) + "ms.")
 
     #######
     # Read and prepare the file for transfer
