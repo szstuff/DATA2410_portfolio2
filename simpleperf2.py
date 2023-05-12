@@ -488,7 +488,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
         file_size / 1000) + "KB.")
     file_size = file_size * 8  ## Converting file_size to bits
     throughput = (file_size / transferTime) / 1000_000  ##Calculating Mbps
-    print("## Troughput: " + str(round(throughput, 2)) + "Mbps")
+    print("## Throughput: " + str(round(throughput, 2)) + "Mbps")
 
     # ------- two way handshake ---------
     # ends the connection with a two-way handshake
