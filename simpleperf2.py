@@ -276,7 +276,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     #######
     timeout_s = end_time - start_time
     client_socket.settimeout(4 * timeout_s)
-    print("##### Timeout set to " + str(4*timeout_s) + "ms. RTT: " + str(timeout_s) + "ms.")
+    print("##### Timeout set to " + str(round((4*timeout_s), 2)) + "ms. RTT: " + str(round(timeout_s, 2)) + "ms.")
 
     #######
     # Read and prepare the file for transfer
@@ -480,6 +480,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
 
     # Send file with chosen reliability protocol
+    transferStartTime = time.time()
     if reliability == "SAW":
         stop_wait() # Send packet using Stop-And-Wait
     elif reliability == "GBN":
@@ -487,11 +488,17 @@ def client(ip, port, filename, reliability, testcase, window_size):
         gbn(serverAddress)
     elif reliability == "SR":
         sr()  # Send packet using Selective Repeat protocol
+    transferEndTime = time.time()
+    transferTime = transferEndTime - transferStartTime
 
     file.close()
 
     # Clear last line and print completion message.
     print("##### Transfer complete.")
+    print("## Total time: " + str(round(transferTime, 2)) + ". Size of file transferred: " + str(file_size/1000) + "KB.")
+    file_size = file_size * 8 ## Converting file_size to bits
+    throughput = (file_size/transferTime)/1000_000 ##Calculating Mbps
+    print("## Troughput: " + str(round(throughput, 2)) + "Mbps")
 
     # ------- two way handshake ---------
     # ends the connection with a two-way handshake
