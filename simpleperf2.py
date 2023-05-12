@@ -195,8 +195,9 @@ def server(ip, port, reliability, testcase, window_size):
     # Remove any null bytes in the filename
     filename = filename.replace('\0', '')
     filename = "received_" + str(filename)
+
     # Save the concatenated file to disk
-    f = open((f'received_{str(filename)}'), "wb")
+    f = open(f'received_{filename}', "wb")
     f.write(finalFile)
     f.close()
 
@@ -356,22 +357,23 @@ def client(ip, port, filename, reliability, testcase, window_size):
     def gbn(serverAddress):
         testcaseNotRun = True
 
-        # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
-        base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
+        base = 0  # First value of the window
+        next_seq_num = 0  # Tracks the sequence number of the next packet to be sent
         received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
 
-        while base < no_of_packets - 1:
+        while base < no_of_packets:
+            receivedAll = True
             for i, ack in enumerate(received_acks):
                 if ack and i > base:
                     base = i
                 elif ack == False and i > base:
+                    receivedAll = False
                     break
-            scope = base + window_size - 1
-            if scope >= no_of_packets:
-                scope = no_of_packets - 1
-            j = base
-
-            while j <= scope:
+            scope = min(base + window_size, no_of_packets)
+            j = next_seq_num
+            if receivedAll:
+                break
+            while j < scope:
                 if j == 3 and testcaseNotRun:
                     if testcase == "SKIP_SEQ":
                         j += 1
@@ -391,26 +393,27 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
 
+                    if j == next_seq_num:
+                        client_socket.settimeout(0.5)
+
+                    next_seq_num += 1
+
                 j += 1
+                client_socket.settimeout(0.5)
 
             try:
-                # Receive ACK
-                j = base
-                while j <= scope:
-                    print("j:" +str(j))
-                    print("scope:" +str(scope))
-                    response, null = client_socket.recvfrom(1472)
-                    seq, ack, flags, win = parse_header(response)
+                # Receive ACKs
+                response, null = client_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(response)
 
-                    if flags == 4:  # If flags = ACK and ack is equal to seq
-                        received_acks[ack] = True
+                if flags == 4 and ack >= base:  # If flags = ACK and ack is equal to or greater than the base
+                    for i in range(base, ack+1):
+                        received_acks[i] = True
 
-                        if base == no_of_packets:
-                            break
-                    j += 1
             except socket.timeout:
                 print("Timeout occurred. Resending packets...")
-                # Vi må finne en måtte å håndtere timeout
+                next_seq_num = base
+
 
     def sr():
         testcaseNotRun = True
