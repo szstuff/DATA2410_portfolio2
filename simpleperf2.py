@@ -603,7 +603,7 @@ def checkTestCase(val):
         raise Exception(
             "Could not parse -t testcase input. Expected: \"SKIP_ACK\", \"SKIP_SEQ\" or \"LOSS\", Actual: " + str(val))
 
-# Check windwo size from command line argument
+# Window size from command line argument
 def checkWindow(val):
     val = int(val)
     if not (1 <= val <= 15):
