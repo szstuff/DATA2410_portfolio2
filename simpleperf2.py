@@ -397,6 +397,8 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 # Receive ACK
                 j = base
                 while j <= scope:
+                    print("j:" +str(j))
+                    print("scope:" +str(scope))
                     response, null = client_socket.recvfrom(1472)
                     seq, ack, flags, win = parse_header(response)
 
