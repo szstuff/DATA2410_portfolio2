@@ -405,6 +405,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                         if base == no_of_packets:
                             break
+                    j += 1
             except socket.timeout:
                 print("Timeout occurred. Resending packets...")
                 # Vi må finne en måtte å håndtere timeout
@@ -458,8 +459,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                         if base == no_of_packets:
                             break
-                    else:
-                        pass
+                    j += 1
             except socket.timeout:
                 print("Timeout occurred. Resending packets...")
                 # Vi må finne en måtte å håndtere timeout
