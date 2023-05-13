@@ -414,8 +414,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
     def gbn(serverAddress):
         testcaseNotRun = True
-
-        # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
         base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
         j = base
         received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
@@ -427,8 +425,10 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 elif ack == False and i >= base:
                     base = i
                     break
+
             base = j
             scope = base + window_size - 1
+
             if scope >= no_of_packets:
                 scope = no_of_packets - 1
 
@@ -464,12 +464,14 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                     if flags == 4 and ack >= base:  # If flags = ACK and ack is equal to seq
                         for k in range(base, ack+1):
-                            received_acks[k] = True
+                            print(received_acks)
+                            received_acks[ack] = True
                         base = ack+1
 
                         if base == no_of_packets:
                             break
                     j += 1
+
             except socket.timeout:
                 print("Timeout occurred. Resending packets... j:" +str(j - 1))
                 j = j - 1
