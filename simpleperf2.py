@@ -96,6 +96,7 @@ def server(ip, port, reliability, testcase, window_size):
                 # Receive packet
                 packet, client_address = server_socket.recvfrom(1472)
                 seq, ack, flags, win = parse_header(packet)
+                #print("received seq "+str(seq))
                 data = packet[12:]
 
                 # Add the data to the file at its correct index
@@ -111,10 +112,12 @@ def server(ip, port, reliability, testcase, window_size):
 
                 response = create_packet(seq, seq, 4, window_size, "".encode())
                 server_socket.sendto(response, client_address)
+                #print("Sent ack "+str(seq))
                 seqNumTracker += 1
 
             except Exception as e:
                 print(f"Exception occurred: {e}")
+
 
     def sr():
         testcaseNotRun = True
@@ -209,6 +212,7 @@ def server(ip, port, reliability, testcase, window_size):
     # sends an ACK to acknowledge the SYN ACK from the client
     # ----------- two way handshake ---------------
     # Receive response and parse header from client
+    print("Receiving  2wayhandshake")
     data, null = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
 
@@ -217,6 +221,7 @@ def server(ip, port, reliability, testcase, window_size):
         sequence_number = 0
         acknowledgment_number = seq  # Server acknowledges that packet with sequence_nr is received
         flags = 6  # FIN-ACK flags
+        print("Sendong ACK  2wayhandshake")
 
         packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
         server_socket.sendto(packet, client_address)
@@ -354,11 +359,10 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
     ###NY VERSJON
-    def gbn(serverAddress):
+    def joviagbn(serverAddress):
         testcaseNotRun = True
 
         base = 0  # First value of the window
-        next_seq_num = 0  # Tracks the sequence number of the next packet to be sent
         received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
 
         while base < no_of_packets:
@@ -370,9 +374,9 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     receivedAll = False
                     break
             scope = min(base + window_size, no_of_packets)
-            j = next_seq_num
             if receivedAll:
                 break
+            j = base
             while j < scope:
                 if j == 3 and testcaseNotRun:
                     if testcase == "SKIP_SEQ":
@@ -392,14 +396,9 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
-
-                    if j == next_seq_num:
-                        client_socket.settimeout(0.5)
-
-                    next_seq_num += 1
+                    j += 1
 
                 j += 1
-                client_socket.settimeout(0.5)
 
             try:
                 # Receive ACKs
@@ -407,15 +406,143 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 seq, ack, flags, win = parse_header(response)
 
                 if flags == 4 and ack >= base:  # If flags = ACK and ack is equal to or greater than the base
-                    for i in range(base, ack+1):
-                        received_acks[i] = True
+                    received_acks[j] = True
 
             except socket.timeout:
                 print("Timeout occurred. Resending packets...")
-                next_seq_num = base
+                j = base
 
+    def gbn(serverAddress):
+        testcaseNotRun = True
+
+        # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
+        base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
+        received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
+
+        while base < no_of_packets - 1:
+            receivedAll = True
+            for i, ack in enumerate(received_acks):
+                if ack and i >= base:
+                    base = i
+                elif ack == False and i >= base:
+                    base = i
+                    #print("Satt base til " + str(base))
+                    receivedAll = False
+                    break
+            scope = base + window_size - 1
+            if scope >= no_of_packets:
+                scope = no_of_packets - 1
+            j = base
+            if receivedAll:
+                break
+            while j <= scope:
+                if j == 3 and testcaseNotRun:
+                    if testcase == "SKIP_SEQ":
+                        j += 1
+                        testcaseNotRun = False
+                    elif testcase == "DUPLICATE":
+                        j -= 1
+                        testcaseNotRun = False
+
+                data = split_file[j]
+                try:
+                    received_acks[j + 1] = False
+                except:
+                    pass
+                packet = create_packet(j, 0, 0, window_size, data)
+
+                # Send packet to receiver
+                client_socket.sendto(packet, serverAddress)
+                #print("sent packet " +str(j))
+
+                j += 1
+
+            try:
+                # Receive ACK
+                j = base
+                while j <= scope:
+                    #print("j:" +str(j))
+                    #print("scope:" +str(scope))
+                    response, null = client_socket.recvfrom(1472)
+                    seq, ack, flags, win = parse_header(response)
+
+                    if flags == 4:  # If flags = ACK and ack is equal to seq
+                        received_acks[ack] = True
+                        #print("received ack " +str(ack))
+
+                        if base == no_of_packets:
+                            break
+                    j += 1
+            except socket.timeout:
+                print("Timeout occurred. Resending packets... j:" +str(j))
+        #print(received_acks)
 
     def sr():
+        testcaseNotRun = True
+
+        # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
+        base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
+        received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
+
+        while base < no_of_packets - 1:
+            receivedAll = True
+            for i, ack in enumerate(received_acks):
+                if ack and i >= base:
+                    base = i
+                elif ack == False and i >= base:
+                    base = i
+                    #print("Satt base til " + str(base))
+                    receivedAll = False
+                    break
+            scope = base + window_size - 1
+            if scope >= no_of_packets:
+                scope = no_of_packets - 1
+            j = base
+            if receivedAll:
+                break
+            while j <= scope:
+                if j == 3 and testcaseNotRun:
+                    if testcase == "SKIP_SEQ":
+                        j += 1
+                        testcaseNotRun = False
+                    elif testcase == "DUPLICATE":
+                        j -= 1
+                        testcaseNotRun = False
+                if not received_acks[j]:
+                    data = split_file[j]
+                    try:
+                        received_acks[j + 1] = False
+                    except:
+                        pass
+                    packet = create_packet(j, 0, 0, window_size, data)
+
+                    # Send packet to receiver
+                    client_socket.sendto(packet, serverAddress)
+                    #print("sent packet " +str(j))
+
+                j += 1
+
+            try:
+                # Receive ACK
+                j = base
+                while j <= scope:
+                    #print("j:" +str(j))
+                    #print("scope:" +str(scope))
+                    response, null = client_socket.recvfrom(1472)
+                    seq, ack, flags, win = parse_header(response)
+
+                    if flags == 4:  # If flags = ACK and ack is equal to seq
+                        received_acks[ack] = True
+                        #print("received ack " +str(ack))
+
+                        if base == no_of_packets:
+                            break
+                    j += 1
+            except socket.timeout:
+                print("Timeout occurred. Resending packets... j:" +str(j))
+        #print(received_acks)
+
+    def gammelsr():
         testcaseNotRun = True
         # Jeg kopierte jovia sin GBN for å prøve å fikse feilen uten å slette fremgang <3
 
@@ -424,16 +551,19 @@ def client(ip, port, filename, reliability, testcase, window_size):
         received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
 
         while base < no_of_packets - 1:
+            receivedAll = True
             for i, ack in enumerate(received_acks):
                 if ack and i > base:
                     base = i
                 elif ack == False and i > base:
+                    receivedAll = False
                     break
             scope = base + window_size - 1
             if scope >= no_of_packets:
                 scope = no_of_packets - 1
             j = base
-
+            if receivedAll:
+                break
             while j <= scope:
                 if j == 3 and testcaseNotRun:
                     if testcase == "SKIP_SEQ":
@@ -467,7 +597,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     j += 1
             except socket.timeout:
                 print("Timeout occurred. Resending packets...")
-                # Vi må finne en måtte å håndtere timeout
 
     # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
     # If no ack received, it waits for timeout, and tries to send the packet again.
