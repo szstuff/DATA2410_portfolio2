@@ -1,0 +1,92 @@
+##### Starting in client mode
+## Protocol: SAW | File: tesla.jpg | Testcase: None | Window: 5
+##### Threeway handshake
+##### Timeout set to 102.59ms. RTT: 25.65ms.
+##### Preparing to send metadata
+Timeout for packet with sequence number: 5, resending
+Timeout for packet with sequence number: 10, resending
+Timeout for packet with sequence number: 23, resending
+Timeout for packet with sequence number: 37, resending
+Timeout for packet with sequence number: 38, resending
+Timeout for packet with sequence number: 38, resending
+Timeout for packet with sequence number: 60, resending
+Timeout for packet with sequence number: 61, resending
+Timeout for packet with sequence number: 65, resending
+Timeout for packet with sequence number: 67, resending
+Timeout for packet with sequence number: 73, resending
+Timeout for packet with sequence number: 79, resending
+Timeout for packet with sequence number: 125, resending
+Timeout for packet with sequence number: 172, resending
+Timeout for packet with sequence number: 175, resending
+Timeout for packet with sequence number: 178, resending
+Timeout for packet with sequence number: 182, resending
+Timeout for packet with sequence number: 199, resending
+Timeout for packet with sequence number: 210, resending
+Timeout for packet with sequence number: 217, resending
+Timeout for packet with sequence number: 236, resending
+Timeout for packet with sequence number: 259, resending
+Timeout for packet with sequence number: 272, resending
+Timeout for packet with sequence number: 281, resending
+Timeout for packet with sequence number: 302, resending
+Timeout for packet with sequence number: 321, resending
+Timeout for packet with sequence number: 348, resending
+Timeout for packet with sequence number: 352, resending
+Timeout for packet with sequence number: 359, resending
+Timeout for packet with sequence number: 393, resending
+Timeout for packet with sequence number: 396, resending
+Timeout for packet with sequence number: 408, resending
+Timeout for packet with sequence number: 410, resending
+Timeout for packet with sequence number: 416, resending
+Timeout for packet with sequence number: 451, resending
+Timeout for packet with sequence number: 451, resending
+Timeout for packet with sequence number: 475, resending
+Timeout for packet with sequence number: 483, resending
+Timeout for packet with sequence number: 483, resending
+Timeout for packet with sequence number: 498, resending
+Timeout for packet with sequence number: 506, resending
+Timeout for packet with sequence number: 513, resending
+Timeout for packet with sequence number: 533, resending
+Timeout for packet with sequence number: 543, resending
+Timeout for packet with sequence number: 544, resending
+Timeout for packet with sequence number: 555, resending
+Timeout for packet with sequence number: 563, resending
+Timeout for packet with sequence number: 566, resending
+Timeout for packet with sequence number: 582, resending
+Timeout for packet with sequence number: 592, resending
+Timeout for packet with sequence number: 629, resending
+Timeout for packet with sequence number: 639, resending
+Timeout for packet with sequence number: 639, resending
+Timeout for packet with sequence number: 646, resending
+Timeout for packet with sequence number: 654, resending
+Timeout for packet with sequence number: 655, resending
+Timeout for packet with sequence number: 657, resending
+Timeout for packet with sequence number: 665, resending
+Timeout for packet with sequence number: 666, resending
+Timeout for packet with sequence number: 670, resending
+Timeout for packet with sequence number: 673, resending
+Timeout for packet with sequence number: 691, resending
+Timeout for packet with sequence number: 702, resending
+Timeout for packet with sequence number: 702, resending
+Timeout for packet with sequence number: 705, resending
+Timeout for packet with sequence number: 714, resending
+Timeout for packet with sequence number: 719, resending
+Timeout for packet with sequence number: 722, resending
+Timeout for packet with sequence number: 722, resending
+Timeout for packet with sequence number: 724, resending
+Timeout for packet with sequence number: 729, resending
+Timeout for packet with sequence number: 729, resending
+Timeout for packet with sequence number: 736, resending
+Timeout for packet with sequence number: 759, resending
+Timeout for packet with sequence number: 772, resending
+Timeout for packet with sequence number: 776, resending
+Timeout for packet with sequence number: 784, resending
+Timeout for packet with sequence number: 802, resending
+Timeout for packet with sequence number: 826, resending
+Timeout for packet with sequence number: 834, resending
+Timeout for packet with sequence number: 836, resending
+Timeout for packet with sequence number: 841, resending
+Timeout for packet with sequence number: 857, resending
+Timeout for packet with sequence number: 858, resending
+##### Transfer complete.
+## Total time: 33.06. Size of file transferred: 1260.396KB.
+## Throughput: 0.3Mbps

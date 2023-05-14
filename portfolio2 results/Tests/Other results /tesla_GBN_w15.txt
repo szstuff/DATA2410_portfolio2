@@ -1,0 +1,8 @@
+##### Starting in client mode
+## Protocol: GBN | File: tesla.jpg | Testcase: None | Window: 15
+##### Threeway handshake
+##### Timeout set to 107.66ms. RTT: 26.92ms.
+##### Preparing to send metadata
+##### Transfer complete.
+## Total time: 1.7. Size of file transferred: 1260.396KB.
+## Throughput: 5.94Mbps

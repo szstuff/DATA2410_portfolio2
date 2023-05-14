@@ -1,0 +1,10 @@
+##### Starting in client mode
+## Protocol: SAW | File: simpleperf2.py | Testcase: SKIP_ACK | Window: 5
+##### Threeway handshake
+##### Timeout set to 108.81ms. RTT: 27.2ms.
+##### Preparing to send metadata
+Timeout for packet with sequence number: 3, resending
+##### Transfer complete.
+## Total time: 0.74. Size of file transferred: 31.665KB.
+## Throughput: 0.34Mbps
+##### Connection closed

@@ -1,0 +1,9 @@
+##### Starting in client mode
+## Protocol: GBN | File: simpleperf2.py | Testcase: None | Window: 10
+##### Threeway handshake
+##### Timeout set to 212.44ms. RTT: 53.11ms.
+##### Preparing to send metadata
+##### Transfer complete.
+## Total time: 0.16. Size of file transferred: 31.665KB.
+## Throughput: 1.57Mbps
+##### Connection closed

@@ -1,0 +1,9 @@
+##### Starting in client mode
+## Protocol: SR | File: simpleperf2.py | Testcase: None | Window: 10
+##### Threeway handshake
+##### Timeout set to 402.0ms. RTT: 100.5ms.
+##### Preparing to send metadata
+##### Transfer complete.
+## Total time: 0.31. Size of file transferred: 31.665KB.
+## Throughput: 0.81Mbps
+##### Connection closed
