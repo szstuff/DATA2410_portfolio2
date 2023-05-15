@@ -1,18 +1,20 @@
-import header
 import socket
 import argparse
-import sys
 import re
 import time
 import os
-from header import *
+try: #Checks if header.py is accessible
+    from header import *
+except:
+    raise Exception("Could not import dependencies. Confirm that header.py is available in the same directory as the application")
 
 
 # Main server function, initialises the server with specified parameters
 def server(ip, port, reliability, testcase, window_size):
     # ip and port: Which IP-address and port the server should listen to
     # reliability: What reliability protocol should be used for the connection
-    # testcase: XXXXX ????
+    # testcase: Which artificial testcase to use when receiving, if any.
+    # window_size: What window size to use for SR and GBN
 
     server_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # creating the socket
     # This code runs through ports until it finds an open one
@@ -55,25 +57,21 @@ def server(ip, port, reliability, testcase, window_size):
     seq, ack, flags, win = parse_header(data)  # Extract header fields from received packet
 
     if not flags == 4:  # If packet is not an ACK packet
-        raise Exception("Expected SYN (8) packet. Received: " + str(flags))
-
-    # Preparing for file transfer
-    filename = ""
-    no_of_packets = 0
-    expectedFilesize = 0
-    received_data = []
+        raise Exception("Expected ACK (4) packet. Received: " + str(flags))
 
     ########
     # Receive metadata from client
     ########
+    filename = ""
+    no_of_packets = 0
+    received_data = []
     print("##### Preparing to receive metadata")
     while True:
         try:
             metadata, client_address = server_socket.recvfrom(1472)  # Wait for packet to arrive
-            filename, no_of_packets, expectedFilesize = unpack_metadata(
+            filename, no_of_packets = unpack_metadata(
                 metadata)  # Extract metadata from received packet
             no_of_packets = int(no_of_packets)  # Convert no_of_packets into int
-            expectedFilesize = int(expectedFilesize)  # Convert expectedFilesize into int
             sequence_number = 0
             acknowledgment_number = 0
             received_data = [None] * (no_of_packets)
@@ -83,51 +81,15 @@ def server(ip, port, reliability, testcase, window_size):
             break
         except Exception as e:
             raise Exception("Exception when receiving metadata" + str(e))
-            sys.exit()
 
-    def gbn():
-        testcaseNotRun = True
-        seqNumTracker = 0
+    def gbn(): #Starts file transfer using GBN
+        testcase_not_run = True # Used to skip ack only once when a testcase is set
+        seq_num_tracker = 0     # Tracks sequence number that is expected from the client
 
-        # Loop through every packet that is received
-        # for i in range(no_of_packets):
-        while seqNumTracker < no_of_packets:
+        # Loop until every packet is received
+        while seq_num_tracker < no_of_packets:
             try:
-                # Receive packet
-                packet, client_address = server_socket.recvfrom(1472)
-                seq, ack, flags, win = parse_header(packet)
-                #print("received seq "+str(seq))
-                data = packet[12:]
-
-                # Add the data to the file at its correct index
-                received_data[seq] = data
-
-                if not seqNumTracker == seq:
-                    seqNumTracker = seq
-
-                if seqNumTracker == 3 and testcaseNotRun and testcase == "SKIP_ACK":
-                    testcaseNotRun = False
-                    seqNumTracker += 1
-                    continue
-
-                response = create_packet(seq, seq, 4, window_size, "".encode())
-                server_socket.sendto(response, client_address)
-                #print("Sent ack "+str(seq))
-                seqNumTracker += 1
-
-            except Exception as e:
-                print(f"Exception occurred: {e}")
-
-
-    def sr():
-        testcaseNotRun = True
-        seqNumTracker = 0
-
-        # Loop through every packet that is received
-        # for i in range(no_of_packets):
-        while seqNumTracker < no_of_packets:
-            try:
-                # Receive packet
+                # Receive packet, parse header and separate data from header
                 packet, client_address = server_socket.recvfrom(1472)
                 seq, ack, flags, win = parse_header(packet)
                 data = packet[12:]
@@ -135,44 +97,90 @@ def server(ip, port, reliability, testcase, window_size):
                 # Add the data to the file at its correct index
                 received_data[seq] = data
 
-                if not seqNumTracker == seq:
-                    seqNumTracker = seq
+                # If the sequence number is not as expected, a packet has
+                # been lost and seq_num_tracker needs to be updated
+                if not seq_num_tracker == seq:
+                    seq_num_tracker = seq
 
-                if seqNumTracker == 3 and testcaseNotRun and testcase == "SKIP_ACK":
-                    testcaseNotRun = False
-                    seqNumTracker += 1
-                    continue
+                #Skips ACK for sequence 3 if testcase is set to SKIP_ACK
+                if seq_num_tracker == 3 and testcase_not_run and testcase == "SKIP_ACK":
+                    testcase_not_run = False
+                    seq_num_tracker += 1
+                    continue #Skip the rest of the code in the loop to simulate a lost packet
 
                 response = create_packet(seq, seq, 4, window_size, "".encode())
                 server_socket.sendto(response, client_address)
-                seqNumTracker += 1
+                seq_num_tracker += 1
+
             except Exception as e:
                 print(f"Exception occurred: {e}")
 
-    def stop_wait():
-        testcaseNotRun = True
-        # Iterate through every expected packet
+
+    def sr(): #Starts file transfer using SR
+        testcase_not_run = True # Used to skip ack only once when a testcase is set
+        seq_num_tracker = 0     # Tracks sequence number that is expected from the client
+
+        # Loop until every packet is received
+        while seq_num_tracker < no_of_packets:
+            try:
+                # Receive packet, parse header and separate data from header
+                packet, client_address = server_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(packet)
+                data = packet[12:]
+
+                # Add the data to the file at its correct index
+                received_data[seq] = data
+
+                # If the sequence number is not as expected, a packet has
+                # been lost and seq_num_tracker needs to be updated
+                if not seq_num_tracker == seq:
+                    seq_num_tracker = seq
+
+                #Skips ACK for sequence 3 if testcase is set to SKIP_ACK
+                if seq_num_tracker == 3 and testcase_not_run and testcase == "SKIP_ACK":
+                    testcase_not_run = False
+                    seq_num_tracker += 1
+                    continue #Skip the rest of the code in the loop to simulate a lost packet
+
+                response = create_packet(seq, seq, 4, window_size, "".encode())
+                server_socket.sendto(response, client_address)
+                seq_num_tracker += 1
+
+            except Exception as e:
+                print(f"Exception occurred: {e}")
+
+    def stop_wait(): #Starts file transfer using Stop and Wait
+        testcase_not_run = True # Used to skip ack only once when a testcase is set
         i = 0
-        # for i in range(no_of_packets):
+
+        # Iterate through every expected packet
         while i < no_of_packets:
             try:
-                packet, client_address = server_socket.recvfrom(1472)  # Receive a packet
-                seq, ack, flags, win = parse_header(packet)  # Parse the header of the packet
-                data = packet[12:]  # Extract the data from the packet
-                received_data[seq] = data  # Add the received data to the received_data list
+                # Receive packet, parse header and separate data from header
+                packet, client_address = server_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(packet)
+                data = packet[12:]
 
+                # Add the data to the file at its correct index
+                received_data[seq] = data
+
+                # If the sequence number is not as expected, a packet has
+                # been lost and seq_num_tracker needs to be updated
                 if not i == seq:
                     i = seq
 
+                #Skips ACK for sequence 3 if testcase is set to SKIP_ACK
                 if seq == i:  # If the received sequence number matches the expected sequence number
-                    if i == 3 and testcaseNotRun and testcase == "SKIP_ACK":
-                        testcaseNotRun = False
+                    if i == 3 and testcase_not_run and testcase == "SKIP_ACK":
+                        testcase_not_run = False
                         i += 1
-                        continue
+                        continue #Skip the rest of the code in the loop to simulate a lost packet
+
                 response = create_packet(seq, seq, 4, window_size, "".encode())  # Create an ACK packet
                 server_socket.sendto(response, client_address)  # Send the ACK packet to client
                 i += 1
-            except Exception as e:  # Handle possible exceptions
+
+            except Exception as e:
                 print(f"Exception occurred: {e}")
 
     if reliability == "SAW":
@@ -186,16 +194,15 @@ def server(ip, port, reliability, testcase, window_size):
         sr()  # Send packet using Selective-Repeat
 
     finalFile = b''  # Empty bytes object to hold joined file data
-    # Iterate through received_data array and add packets to finalFile
     print("##### Saving file to disk")
-
+    # Iterate through received_data array and add packets to finalFile
     for i, arrayItem in enumerate(received_data):
         try:
             finalFile += arrayItem
         except Exception as e:
             print("Could not add file with index " + str(i) + " to working file. e: " + str(e))
 
-    # Remove any null bytes in the filename
+    # Remove any null bytes in the filename and add "received_" to the start of the filename
     filename = filename.replace('\0', '')
     filename = "received_" + str(filename)
 
@@ -204,32 +211,28 @@ def server(ip, port, reliability, testcase, window_size):
     f.write(finalFile)
     f.close()
 
-    # Clear last line and print completion message.
     print("##### Successfully saved file as " + str(filename))
 
-    # close server
-    # A two-way handshake to close the connection
-    # sends an ACK to acknowledge the SYN ACK from the client
-    # ----------- two way handshake ---------------
+    ########
+    # Close server with two-way handshake
+    ########
     # Receive response and parse header from client
-    print("Receiving  2wayhandshake")
+    print("Receiving two-way handshake")
     data, null = server_socket.recvfrom(1472)
     seq, ack, flags, win = parse_header(data)
 
     if flags == 2:  # If FIN packet received
-        # Sends a ACK for the FIN
+        # Sends an ACK for the FIN
         sequence_number = 0
         acknowledgment_number = seq  # Server acknowledges that packet with sequence_nr is received
         flags = 6  # FIN-ACK flags
-        print("Sendong ACK  2wayhandshake")
 
         packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
         server_socket.sendto(packet, client_address)
         server_socket.close()
         print("##### Connection closed")
     else:
-        print("Error closing connection")
-    # ------- slutten på two way handshake -----------
+        raise Exception("Error closing connection")
 
 
 # Main client function, initialises the client with specified parameters
@@ -237,7 +240,8 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # ip and port: Which IP-address and port the client should send to
     # filename: path to file to be sent over the program
     # reliability: What reliability protocol should be used for the connection
-    # testcase: Used to simulate issues like lost packets to
+    # testcase: Which artificial testcase to use when sending, if any.
+    # window_size: What window size to use for SR and GBN
 
     client_socket = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)  # Creating socket
     serverAddress = (ip, port)  # The IP:PORT tuple is saved as a variable for simplicity
@@ -253,7 +257,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     flags = 8  # SYN flag
 
     # Create SYN packet
-    packet = header.create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
+    packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
     start_time = time.time()
     client_socket.sendto(packet, serverAddress)
 
@@ -264,10 +268,10 @@ def client(ip, port, filename, reliability, testcase, window_size):
         end_time = time.time()
 
         # 3. Client sends final ACK to server
-        packet = header.create_packet(sequence_number, ack, 4, window_size, "".encode())
+        packet = create_packet(sequence_number, ack, 4, window_size, "".encode())
         client_socket.sendto(packet, serverAddress)
     else:
-        raise exception('SYN-ACK packet not received!')
+        raise Exception('SYN-ACK packet not received!')
 
     #######
     # Set timeout using measured RTT
@@ -287,14 +291,13 @@ def client(ip, port, filename, reliability, testcase, window_size):
     split_file = []
 
     ########
-    # Receive metadata from client
+    # Send metadata to server
     ########
     print("##### Preparing to send metadata")
     # Open file in binary mode and read data
     with open(filename, "rb") as file:
         file_data = file.read()  # Read the contents of the file into a byte string
         file_size = len(file_data)  # Determine size in bytes of the file
-        # no_of_packets = int(math.ceil(file_size / packetsize))  # Calculate number of packets this file needs to be split into.
 
         # Split file into an array where each index contains up to packetsize (1460) bytes
         for index in range(0, file_size, packetsize):
@@ -305,7 +308,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
         #######
         # Create metadata containing the filename, total number of packets and the total file size
         #######
-        metadata = pack_metadata(filename, no_of_packets, file_size)
+        metadata = pack_metadata(filename, no_of_packets)
         packet = create_packet(1, 0, 0, window_size, metadata)
 
         while True:
@@ -321,14 +324,13 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 if flags == 4 and ack == 0:  # If the response is an ACK == 0, break the loop
                     break
             except Exception as e:
-                print("Exception when sending metadata: " + str(e))
-                sys.exit()
+                raise Exception("Issue occurred when sending metadata: " + str(e))
 
-    def stop_wait():
+    def stop_wait(): #Starts file transfer using Stop-and-Wait
         offset = sequence_number  # Sequence_number is not 0 because of previous messages.
         # Sequence_number is used as an offset for i to send the correct seq to server
 
-        for i, packet_data in enumerate(split_file):
+        for i, packet_data in enumerate(split_file): #Iterate through the file and send each packet
             # packet = create_packet(i+offset, ack, flags, win, packet_data)
             packet = create_packet(i, 0, 0, window_size, packet_data)
 
@@ -358,37 +360,36 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
     # Go-Back-N is a protocol that let us send continuous streams of packets without waiting
     # for ACK of the previous packet.
-    def gbn(serverAddress):
-        testcaseNotRun = True
+    def gbn(serverAddress): #Starts file transfer using GBN
+        testcase_not_run = True
 
-        # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
         base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
         received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
 
         while base < no_of_packets - 1:
-            receivedAll = True
+            received_all = True
             for i, ack in enumerate(received_acks):
                 if ack and i >= base:
                     base = i
                 elif ack == False and i >= base:
                     base = i
                     #print("Satt base til " + str(base))
-                    receivedAll = False
+                    received_all = False
                     break
             scope = base + window_size - 1
             if scope >= no_of_packets:
                 scope = no_of_packets - 1
             j = base
-            if receivedAll:
+            if received_all:
                 break
             while j <= scope:
-                if j == 3 and testcaseNotRun:
+                if j == 3 and testcase_not_run:
                     if testcase == "SKIP_SEQ":
                         j += 1
-                        testcaseNotRun = False
+                        testcase_not_run = False
                     elif testcase == "DUPLICATE":
                         j -= 1
-                        testcaseNotRun = False
+                        testcase_not_run = False
 
                 data = split_file[j]
                 try:
@@ -423,37 +424,36 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 print("Timeout occurred. Resending packets... j:" +str(j))
         #print(received_acks)
 
-    def sr():
-        testcaseNotRun = True
+    def sr(): #Starts file transfer using SR
+        testcase_not_run = True
 
         # Dette er bare for at dere skjønner men base er basically i = 0 som var i SR
         base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
         received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
 
         while base < no_of_packets - 1:
-            receivedAll = True
+            received_all = True
             for i, ack in enumerate(received_acks):
                 if ack and i >= base:
                     base = i
                 elif ack == False and i >= base:
                     base = i
-                    #print("Satt base til " + str(base))
-                    receivedAll = False
+                    received_all = False
                     break
             scope = base + window_size - 1
             if scope >= no_of_packets:
                 scope = no_of_packets - 1
             j = base
-            if receivedAll:
+            if received_all:
                 break
             while j <= scope:
-                if j == 3 and testcaseNotRun:
+                if j == 3 and testcase_not_run:
                     if testcase == "SKIP_SEQ":
                         j += 1
-                        testcaseNotRun = False
+                        testcase_not_run = False
                     elif testcase == "DUPLICATE":
                         j -= 1
-                        testcaseNotRun = False
+                        testcase_not_run = False
                 if not received_acks[j]:
                     data = split_file[j]
                     try:
@@ -496,7 +496,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # SR: Du får ack etter hver eneste pakke.
 
     # Send file with chosen reliability protocol
-    transferStartTime = time.time()
+    transfer_start_time = time.time() # Saves start time so that the total duration and throughput can be calculated
     if reliability == "SAW":
         stop_wait()  # Send packet using Stop-And-Wait
     elif reliability == "GBN":
@@ -504,16 +504,15 @@ def client(ip, port, filename, reliability, testcase, window_size):
     elif reliability == "SR":
         sr()  # Send packet using Selective Repeat protocol
     transferEndTime = time.time()
-    transferTime = transferEndTime - transferStartTime
+    transfer_time = transferEndTime - transfer_start_time #Calculates duration of file transfer
 
     file.close()
 
-    # Clear last line and print completion message.
     print("##### Transfer complete.")
-    print("## Total time: " + str(round(transferTime, 2)) + ". Size of file transferred: " + str(
+    print("## Total time: " + str(round(transfer_time, 2)) + ". Size of file transferred: " + str(
         file_size / 1000) + "KB.")
     file_size = file_size * 8  ## Converting file_size to bits
-    throughput = (file_size / transferTime) / 1000_000  ##Calculating Mbps
+    throughput = (file_size / transfer_time) / 1000_000  ##Calculating Mbps
     print("## Throughput: " + str(round(throughput, 2)) + "Mbps")
 
     # ------- two way handshake ---------
@@ -523,7 +522,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     acknowledgment_number = seq  # Server acknowledges that packet with sequence_nr is received
     flags = 2  # FIN flags
 
-    packet = header.create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
+    packet = create_packet(sequence_number, acknowledgment_number, flags, window_size, "".encode())
     client_socket.sendto(packet, serverAddress)
 
     # Receive response and parse header
@@ -542,8 +541,8 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
 
 # Packs file metadata. Used in client to tell server how to name the file and how big it is
-def pack_metadata(filename, no_of_packets, filesize):
-    return (str(filename) + ":" + str(no_of_packets) + ":" + str(filesize)).encode()
+def pack_metadata(filename, no_of_packets):
+    return (str(filename) + ":" + str(no_of_packets)).encode()
 
 
 # Unpacks metadata. Used by server to check for errors (comparing expected and actual filesize), name file and how many packets to expect
@@ -552,14 +551,11 @@ def unpack_metadata(metadata):
     array = metadata.split(":")
     filename = array[0]
     no_of_packets = array[1]
-    filesize = array[2]
-    return filename, no_of_packets, filesize
+    return filename, no_of_packets
 
 
-# Check-metoder
-###
-
-def checkFile(filename):  # Checks if the file exists in the server's system
+# Functions for input validation
+def check_file(filename):  # Checks if the file exists in the server's system
     if filename == None:
         return None
     if os.path.isfile(filename):
@@ -568,7 +564,7 @@ def checkFile(filename):  # Checks if the file exists in the server's system
         raise argparse.ArgumentTypeError("Could not find file with path " + str(filename))
 
 
-def checkIP(val):  # Checks input of -i flag
+def check_ip(val):  # Checks input of -i flag
     if val == "localhost":  # Used to skip regex, as "localhost" does not match the pattern of an IPv4 address
         return "localhost"
     ipcheck = re.match(r"[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}\.[0-9]{1,3}", str(val))  # regex for IPv4 address
@@ -592,7 +588,7 @@ def checkPort(val):  # Checks input of -p port flag
 
 
 # Check reliability type from command line argument
-def checkReliability(val):
+def check_reliability(val):
     val = val.upper()
     if val is None:
         return None
@@ -604,12 +600,11 @@ def checkReliability(val):
         return "SR"
     else:
         raise Exception(
-            "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(
-                val))
+            "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(val))
 
 
 # Check test case type from command line argument
-def checkTestCase(val):
+def check_test_case(val):
     val = val.upper()
     if val is None:
         return None
@@ -625,7 +620,7 @@ def checkTestCase(val):
 
 
 # Window size from command line argument
-def checkWindow(val):
+def check_window(val):
     val = int(val)
     if not (1 <= val <= 15):
         raise Exception("Invalid window_size. Expected value between 1 and 15. Actual: " + str(val))
@@ -633,43 +628,27 @@ def checkWindow(val):
         return val
 
 
-parser = argparse.ArgumentParser(description="positional arguments",
-                                 epilog="end of help")  # Initialises argsparse parser
+
+parser = argparse.ArgumentParser(description="positional arguments", epilog="end of help")  # Initialises argsparse parser
 # Arguments
 parser.add_argument('-s', '--server', action='store_true', default=False, help="Start in server mode. Default.")
 parser.add_argument('-c', '--client', action='store_true', default=False, help="Start in client mode")
-parser.add_argument('-i', '--ip', type=checkIP, default="127.0.0.1", help="Server IP")
+parser.add_argument('-i', '--ip', type=check_ip, default="127.0.0.1", help="IP to connect to")
 parser.add_argument('-p', '--port', type=checkPort, default="8088", help="Bind to provided port. Default 8088")
-parser.add_argument('-f', '--file', type=checkFile, default=None, help="Path to file to transfer")
-parser.add_argument('-r', '--reliable', type=checkReliability, default="SAW",
-                    help="Choose method for transfer (SAW, GBN or SR)")
-parser.add_argument('-t', '--testcase', type=checkTestCase, default=None,
-                    help="Simulate loss of packets to test error handling in the code.")
-parser.add_argument('-w', '--windowsize', type=checkWindow, default=5, help="Set the window size for GBN and SR.")
+parser.add_argument('-f', '--file', type=check_file, default=None, help="Path to file")
+parser.add_argument('-r', '--reliable', type=check_reliability, default="SAW", help="Choose method for transfer (SAW, GBN or SR)")
+parser.add_argument('-t', '--testcase', type=check_test_case, default=None, help="Simulate loss of packets to test error handling in the code.")
+parser.add_argument('-w', '--windowsize', type=check_window, default=5, help="Set the window size for GBN and SR.")
 args = parser.parse_args()  # Parses arguments provided by user
 
 if args.server:
     print("##### Starting in server mode")
-    print("## Protocol: " + str(args.reliable) + " | Testcase: " + str(args.testcase) + " | Window: " + str(
-        args.windowsize))
+    print("## Protocol: " + str(args.reliable) + " | Testcase: " + str(args.testcase) + " | Window: " + str(args.windowsize))
     server(args.ip, args.port, args.reliable, args.testcase, args.windowsize)
 elif args.client:
     print("##### Starting in client mode")
-    print("## Protocol: " + str(args.reliable) + " | File: " + str(args.file) + " | Testcase: " + str(
-        args.testcase) + " | Window: " + str(args.windowsize))
+    print("## Protocol: " + str(args.reliable) + " | File: " + str(args.file) + " | Testcase: " + str(args.testcase) + " | Window: " + str(args.windowsize))
     client(args.ip, args.port, args.file, args.reliable, args.testcase, args.windowsize)
 else:
     print("##### Could not start the program.")
 
-'''
-NOTTATER til LAB
-1. RTT. Det settes i topologifilen (felt delay)
-2. Testcase. Det holder å hardkode i 1 skip/1 loss i hver 
-3. Hvilke testcases skal det være? Hva skal de gjøre?
-4. 
-
-HUSK Å FIKSE FØLGENDE FØR INNLEVERING <3:
-1. Når SR kjøres med stor testfil og testcase SKIPACK, det står feilmelding på klient:
-    Error closing connection from client
-2. Vi har retry i SAW. Enten legg det til alle klienter, eller slett det fra SAW 
-'''
