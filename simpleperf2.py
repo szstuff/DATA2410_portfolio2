@@ -373,7 +373,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
                     base = i
                 elif ack == False and i >= base:
                     base = i
-                    #print("Satt base til " + str(base))
                     received_all = False
                     break
             scope = base + window_size - 1
@@ -400,7 +399,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                 # Send packet to receiver
                 client_socket.sendto(packet, serverAddress)
-                #print("sent packet " +str(j))
 
                 j += 1
 
@@ -408,21 +406,17 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 # Receive ACK
                 j = base
                 while j <= scope:
-                    #print("j:" +str(j))
-                    #print("scope:" +str(scope))
                     response, null = client_socket.recvfrom(1472)
                     seq, ack, flags, win = parse_header(response)
 
                     if flags == 4:  # If flags = ACK and ack is equal to seq
                         received_acks[ack] = True
-                        #print("received ack " +str(ack))
 
                         if base == no_of_packets:
                             break
                     j += 1
             except socket.timeout:
                 print("Timeout occurred. Resending packets... j:" +str(j))
-        #print(received_acks)
 
     def sr(): #Starts file transfer using SR
         testcase_not_run = True
@@ -464,7 +458,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
 
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
-                    #print("sent packet " +str(j))
 
                 j += 1
 
@@ -472,22 +465,17 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 # Receive ACK
                 j = base
                 while j <= scope:
-                    #print("j:" +str(j))
-                    #print("scope:" +str(scope))
                     response, null = client_socket.recvfrom(1472)
                     seq, ack, flags, win = parse_header(response)
 
                     if flags == 4:  # If flags = ACK and ack is equal to seq
                         received_acks[ack] = True
-                        #print("received ack " +str(ack))
 
                         if base == no_of_packets:
                             break
                     j += 1
             except socket.timeout:
                 print("Timeout occurred. Resending packets... j:" +str(j))
-        #print(received_acks)
-
 
 
     # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
