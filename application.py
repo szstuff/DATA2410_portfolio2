@@ -421,8 +421,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
             packet = create_packet(i, 0, 0, window_size, packet_data)
 
             # Send packet and wait for ACK
-            retries = 0
-            while retries <= 2 * no_of_packets:  # Dynamically scales allowed amount of retries based on filesize
+            while True:
                 try:
                     # Send packet to receiver
                     client_socket.sendto(packet, serverAddress)
@@ -439,7 +438,6 @@ def client(ip, port, filename, reliability, testcase, window_size):
                         continue
 
                 except socket.timeout:
-                    retries += 1
                     print(f"Timeout for packet with sequence number: {i}, resending")
                     # Timeout occurred, re-send packet
                     continue
