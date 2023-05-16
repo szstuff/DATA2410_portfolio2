@@ -115,6 +115,50 @@ def server(ip, port, reliability, testcase, window_size):
             except Exception as e:
                 print(f"Exception occurred: {e}")
 
+    ##This is our newer, modified version of GBN.
+    def gbnv2():
+        seqNumTracker = -1  # Tracks the sequence number of the last packet received
+        testcaseNotRun = True  # Flag to indicate if the testcase has been executed or not
+
+        # Loop through every packet that is received
+        while seqNumTracker < no_of_packets - 1:
+            try:
+                # Receive packet
+                packet, client_address = server_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(packet)
+                data = packet[12:]
+
+                if seq <= seqNumTracker:  # If the received packet is a duplicate, ignore it
+                    continue
+
+                # Add the data to the file at its correct index
+                received_data[seq] = data
+
+                # Check if the received packet's sequence number is the expected next sequence number
+                if seqNumTracker + 1 == seq:
+                    seqNumTracker += 1  # Increase the sequence number tracker by 1
+
+                    # If the sequence number tracker reaches 3 and the testcase is set to "SKIP_ACK" and the testcase flag indicates it has not been executed yet
+                    if seqNumTracker == 3 and testcase == "SKIP_ACK" and testcaseNotRun:
+                        seq = 4  # Skip the acknowledgement for the next packet (simulate a skipped acknowledgement)
+                        testcaseNotRun = False  # Set the testcase flag to indicate it has been executed
+                else:
+                    continue  # If the received packet is not the expected next sequence number, continue to the next iteration of the loop
+
+                # Send ACK
+                if seqNumTracker == seq:
+                    # Create an ACK packet with the same sequence number as the received packet
+                    response = create_packet(seq, seq, 4, window_size, "".encode())
+                    server_socket.sendto(response, client_address)
+                else:
+                    # Create an ACK packet with the expected sequence number
+                    response = create_packet(seq, seq, 4, window_size, "".encode())
+                    server_socket.sendto(response, client_address)
+                    seqNumTracker -= 1
+
+            except:
+                print("An error occurred")
+
 
     def sr(): #Starts file transfer using SR
         testcase_not_run = True # Used to skip ack only once when a testcase is set
@@ -147,6 +191,42 @@ def server(ip, port, reliability, testcase, window_size):
                 seq_num_tracker += 1
 
             except Exception as e:
+                print(f"Exception occurred: {e}")
+
+    ##This is our newer, modified version of SR.
+    def srv2():
+        testcaseNotRun = True  # Flag to indicate if the testcase has been executed or not
+        seqNumTracker = 0  # Tracks the sequence number of the last packet received
+
+        # Loop through every packet that is received
+        while seqNumTracker < no_of_packets:
+            try:
+                # Receive packet
+                packet, client_address = server_socket.recvfrom(1472)
+                seq, ack, flags, win = parse_header(packet)
+                data = packet[12:]
+
+                # Add the data to the file at its correct index
+                received_data[seq] = data
+
+                # Check if the received packet's sequence number is not equal to the expected sequence number
+                if not seqNumTracker == seq:
+                    seqNumTracker = seq  # Update the sequence number tracker
+
+                # Check if the sequence number tracker is 3, testcase has not been executed, and the testcase is set to "SKIP_ACK"
+                if seqNumTracker == 3 and testcaseNotRun and testcase == "SKIP_ACK":
+                    testcaseNotRun = False  # Set the testcase flag to indicate it has been executed
+                    seqNumTracker += 1  # Increase the sequence number tracker
+                    continue  # Skip to the next iteration of the loop
+
+                # Create an ACK packet with the same sequence number as the received packet
+                response = create_packet(seq, seq, 4, window_size, "".encode())
+                server_socket.sendto(response, client_address)  # Send the ACK packet
+
+                seqNumTracker += 1  # Increase the sequence number tracker
+
+            except Exception as e:
+                # Handle any exceptions that occur during packet reception or ACK sending
                 print(f"Exception occurred: {e}")
 
     def stop_wait(): #Starts file transfer using Stop and Wait
@@ -189,16 +269,22 @@ def server(ip, port, reliability, testcase, window_size):
     elif reliability == "GBN":
         print("##### Starting file transfer using Go-Back-N protocol")
         gbn()  # Send packet using Go-Back-N protocol
+    elif reliability == "GBNV2":
+        print("##### Starting file transfer using version 2 of the Go-Back-N protocol")
+        gbnv2()
     elif reliability == "SR":
         print("##### Starting file transfer using Selective Repeat protocol")
         sr()  # Send packet using Selective-Repeat
+    elif reliability == "SRV2":
+        print("##### Starting file transfer using version 2 of the Selective Repeat protocol")
+        srv2()
 
-    finalFile = b''  # Empty bytes object to hold joined file data
+    final_file = b''  # Empty bytes object to hold joined file data
     print("##### Saving file to disk")
-    # Iterate through received_data array and add packets to finalFile
-    for i, arrayItem in enumerate(received_data):
+    # Iterate through received_data array and add packets to final_file
+    for i, array_item in enumerate(received_data):
         try:
-            finalFile += arrayItem
+            final_file += array_item
         except Exception as e:
             print("Could not add file with index " + str(i) + " to working file. e: " + str(e))
 
@@ -208,7 +294,7 @@ def server(ip, port, reliability, testcase, window_size):
 
     # Save the concatenated file to disk
     f = open(f'received_{filename}', "wb")
-    f.write(finalFile)
+    f.write(final_file)
     f.close()
 
     print("##### Successfully saved file as " + str(filename))
@@ -418,6 +504,96 @@ def client(ip, port, filename, reliability, testcase, window_size):
             except socket.timeout:
                 print("Timeout occurred. Resending packets... j:" +str(j))
 
+    ##This is our newer, modified version of GBN.
+    def gbnv2(serverAddress):
+        testcaseNotRun = True  # Flag to indicate if the testcase has been executed or not
+        base = 0  # Tracks the oldest sequence number of the oldest unacknowledged packet
+        j = base
+        received_acks = [False] * no_of_packets  # List of packets that have not been acknowledged
+
+        # Continue until all packets have been acknowledged
+        while base < no_of_packets:
+            # Iterate over the received_acks list along with their indices
+            for i, ack in enumerate(received_acks):
+                # Check if the packet is acknowledged and its index is greater than or equal to the base
+                if ack and i >= base:
+                    base = i  # Update the base to the current acknowledged packet index
+
+                # If the packet is not acknowledged and its index is greater than or equal to the base
+                elif not ack and i >= base:
+                    base = i  # Update the base to the current unacknowledged packet index
+                    break  # Exit the loop since the next packets are not acknowledged yet
+
+            # Set the scope of the current window
+            base = j
+            scope = base + window_size - 1
+
+            # Adjust the scope if it exceeds the total number of packets
+            if scope >= no_of_packets:
+                scope = no_of_packets - 1
+
+            # Send packets within the window
+            while j <= scope:
+                # Check if a specific testcase should be executed
+                if j == 3 and testcaseNotRun:
+                    # If the testcase is to skip a sequence
+                    if testcase == "SKIP_SEQ":
+                        j += 1
+                        testcaseNotRun = False
+
+                    # If the testcase is to duplicate a packet
+                    elif testcase == "DUPLICATE":
+                        j -= 1
+                        testcaseNotRun = False
+
+                # Get the data for the current packet
+                data = split_file[j]
+
+                # Mark the next expected acknowledgment as not received
+                try:
+                    received_acks[j + 1] = False
+                except:
+                    pass
+
+                # Create the packet to be sent
+                packet = create_packet(j, 0, 0, window_size, data)
+
+                # Send the packet to the receiver
+                client_socket.sendto(packet, serverAddress)
+                j += 1
+
+            try:
+                # Receive ACKs for the sent packets
+                j = base
+                while j <= scope:
+                    response, null = client_socket.recvfrom(1472)
+                    seq, ack, flags, win = parse_header(response)
+
+                    # Check if the response is an ACK and matches the expected sequence number
+                    if flags == 4 and ack >= base and seq == j:
+                        # Mark all packets up to the received ACK as acknowledged
+                        for k in range(base, ack + 1):
+                            received_acks[ack] = True
+
+                        base = ack + 1
+
+                        # If all packets have been acknowledged, exit the loop
+                        if base == no_of_packets:
+                            break
+                    else:
+                        print(f"Did not receive ACK for packet {j}. Resending packet...")
+
+                        # Resend the packet that didn't receive an ACK
+                        packet = create_packet(j, 0, 0, window_size, data)
+                        client_socket.sendto(packet, serverAddress)
+                        break
+
+                    j += 1
+            # if anything else happens that is unexpected this line of code will be executed
+            except socket.timeout:
+                print("Timeout occurred. Resending packets... j:" + str(j))
+                j = base
+
     def sr(): #Starts file transfer using SR
         testcase_not_run = True
 
@@ -478,6 +654,103 @@ def client(ip, port, filename, reliability, testcase, window_size):
                 print("Timeout occurred. Resending packets... j:" +str(j))
 
 
+    ##This is our newer, modified version of SR.
+    def srv2():
+        # Flag to indicate if the testcase has been executed or not
+        testcaseNotRun = True
+
+        # Tracks the oldest sequence number of the oldest unacknowledged packet
+        base = 0
+
+        # List of packets that have not been acknowledged
+        received_acks = [False] * no_of_packets
+
+        # Continue until all packets have been acknowledged
+        while base < no_of_packets:
+            # Send packets within the window
+            j = base
+
+            # Calculate the scope of the current window
+            scope = min(base + window_size, no_of_packets) - 1
+
+            # Track the last packet sent within the window
+            last_sent_packet = base - 1
+
+            # Iterate through the packets within the window
+            while j <= scope:
+                # Check if a specific testcase should be executed
+                if j == 3 and testcaseNotRun:
+                    # If the testcase is to skip a sequence
+                    if testcase == "SKIP_SEQ":
+                        j += 1
+                        testcaseNotRun = False
+                        continue
+
+                    # If the testcase is to duplicate a packet
+                    elif testcase == "DUPLICATE":
+                        packet = create_packet(j - 1, 0, 0, window_size, split_file[j - 1])
+                        client_socket.sendto(packet, serverAddress)
+                        print("Sent duplicate packet:", j - 1)
+                        j += 1
+                        testcaseNotRun = False
+                        continue
+
+                # Get the data for the current packet
+                data = split_file[j]
+
+                # If the packet has not been acknowledged, send it
+                if received_acks[j] == False:
+                    packet = create_packet(j, 0, 0, window_size, data)
+                    client_socket.sendto(packet, serverAddress)
+                    last_sent_packet = j  # Update the last sent packet within the window
+                    j += 1
+                else:
+                    scope += 1  # Expand the scope of the window
+                    j += 1
+
+            # Receive ACKs within the window
+            for k in range(base, scope + 1):
+                try:
+                    # Receive response from the server
+                    response, null = client_socket.recvfrom(1472)
+
+                    # Parse the header of the response
+                    seq, ack, flags, win = parse_header(response)
+
+                    # Check if the response is an ACK for an unacknowledged packet
+                    if flags == 4 and base <= ack < no_of_packets and not received_acks[ack]:
+                        received_acks[ack] = True
+
+                        # If the ACK is for the base packet
+                        if ack == base:
+                            # Move the base to the next unacknowledged packet
+                            while base < no_of_packets and received_acks[base]:
+                                base += 1
+
+                            # If all packets have been acknowledged, exit the loop
+                            if base == no_of_packets:
+                                break
+
+                            # If there is a gap in the received ACKs, exit the loop
+                            elif base == scope + 1:
+                                break
+                        else:
+                            print("ACK has been skipped. Resending packet...")
+
+                            # Resend packets from the next one after the last sent packet within the window
+                            for resend_packet in range(last_sent_packet + 1, ack + 1):
+                                # Resend packet
+                                packet = create_packet(resend_packet, 0, 0, window_size, split_file[resend_packet])
+                                client_socket.sendto(packet, serverAddress)
+                                print("Sent packet:", resend_packet)
+
+                            break  # Stop iterating over received ACKs if there is a gap
+
+                except socket.timeout:
+                    print(f"Timeout occurred. Resending packet {base}...")
+                    break
+
+
     # Sender sends a packet and waits to receive ack. After receiving ack, a new packet will be sendt.
     # If no ack received, it waits for timeout, and tries to send the packet again.
 
@@ -489,8 +762,12 @@ def client(ip, port, filename, reliability, testcase, window_size):
         stop_wait()  # Send packet using Stop-And-Wait
     elif reliability == "GBN":
         gbn(serverAddress)  # Send packet using Go-Back-N protocol
+    elif reliability == "GBNV2":
+        gbnv2(serverAddress)
     elif reliability == "SR":
         sr()  # Send packet using Selective Repeat protocol
+    elif reliability == "SRV2":
+        srv2()
     transferEndTime = time.time()
     transfer_time = transferEndTime - transfer_start_time #Calculates duration of file transfer
 
@@ -586,6 +863,10 @@ def check_reliability(val):
         return "GBN"
     elif val == "SR":
         return "SR"
+    elif val == "SRV2":
+        return "SRV2"
+    elif val == "GBNV2":
+        return "GBNV2"
     else:
         raise Exception(
             "Could not parse -r reliability input. Expected: \"SAW\", \"STOP_AND_WAIT\", \"GBN\" or \"SR\". Actual: " + str(val))
