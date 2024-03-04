@@ -17,21 +17,34 @@ The application can be run with the following arguments:
 
 **Server:**
 python3 application.py -s -i <ip_address> -p <port> -r <reliable> -w <window_size> -t <testcase>
--s: Starts the application in server mode
+
+-s: Starts the application in server mode 
+
 -i <ip_address>: IP address the server should connect to. Default: 127.0.0.1
+
 -p <port>: Port that the server should use. Default: 8088 (1024-65534)
+
 -r <reliable>: Which reliability protocol to use for the transfer. Supported: SAW, GBN, SR.
+
 -w <window_size>: How many packets to send at a time (only GBN and SR). (1-15)
+
 -t <testcase>: Which test case to use when receiving data. Supported: SKIP_ACK
 
 **Client:**
 python3 application.py -c -i <ip_address> -p <port> -f [path_to_file] -r <reliable> -w <window_size> -t <testcase> 
+
 -s: Starts the application in client mode
+
 -i <ip_address>: IP address the server should connect to. Default: 127.0.0.1
+
 -p <port>: Port that the server should use. Default: 8088 (1024-65534)
+
 -f [path_to_file]: Specify the path to the file to transfer. 
+
 -r <reliable>: Which reliability protocol to use for the transfer. Supported: SAW, GBN, SR.
+
 -w <window_size>: How many packets to send at a time (only GBN and SR). (1-15)
+
 -t <testcase>: Which test case to use when receiving data. Supported: SKIP_SEQ, DUPLICATE
 
 **Output:**
