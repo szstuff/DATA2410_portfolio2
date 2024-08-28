@@ -1,8 +1,8 @@
-created for an exam for course DATA2410 at OsloMet by:
-	STILIAN TODOROV ZAGOROV – S364531
-	NGOC LINN VU HUYNH – S364523
-	SALONI ARORA CHITKARA – S364538
-	JOVIA NAMAYANJA KAGGWA – S364526
+created for an exam for course DATA2410 at OsloMet by: <br>
+	STILIAN TODOROV ZAGOROV – S364531 <br>
+	NGOC LINN VU HUYNH – S364523 <br>
+	SALONI ARORA CHITKARA – S364538 <br>
+	JOVIA NAMAYANJA KAGGWA – S364526 <br>
 
 The application is a file transfer utility created in Python that uses UDP with custom-made error-handling code to transfer files over the network. The program transfers data reliably and can handle issues related to packets received out of order, duplicate packets, and missing packets.  
 
