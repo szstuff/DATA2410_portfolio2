@@ -1,8 +1,10 @@
-This is a file transfer program that uses UDP with custom-made error-handling code to transfer files over the network.
-The program transfers data reliably and can handle issues related to packets received out of order, duplicate packets, and missing packets.
+created for an exam for course DATA2410 at OsloMet by:
+	STILIAN TODOROV ZAGOROV – S364531
+	NGOC LINN VU HUYNH – S364523
+	SALONI ARORA CHITKARA – S364538
+	JOVIA NAMAYANJA KAGGWA – S364526
 
-created for a group exam for the DATA2410 course at OsloMet
-Last updated: 02.03.2024
+The application is a file transfer utility created in Python that uses UDP with custom-made error-handling code to transfer files over the network. The program transfers data reliably and can handle issues related to packets received out of order, duplicate packets, and missing packets.  
 
 Reliability is ensured by using one of three supported reliable transfer methods based on ARQ: Stop-and-Wait, Go-Back-N, and Selective-Repeat. 
 
@@ -49,8 +51,3 @@ python3 application.py -c -i <ip_address> -p <port> -f [path_to_file] -r <reliab
 
 **Output:**
 The output from the application is printed in the terminal. The client prints information like the measured RTT, transfer time and measured throughput. The client and server both print configuration info including the protocol, file, testcase and window size used for the transfer.
-
-**Errors:**
-The code is designed to be able to run with default values (except for file path, which must always be provided). Issues might occur when only -s or -c argument are specified and (for example) the default port is not available. If issues occur when running, try running the script with all values specified.
-
-Note: 1000 bits = 1Kb, 1000 bytes = 1KB
