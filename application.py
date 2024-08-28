@@ -9,7 +9,7 @@ except:
     raise Exception("Could not import dependencies. Confirm that header.py is available in the same directory as the application")
 
 
-# Main server function, initialises the server with specified parameters
+# initialises the server with specified parameters
 def server(ip, port, reliability, testcase, window_size):
     # ip and port: Which IP-address and port the server should listen to
     # reliability: What reliability protocol should be used for the connection
@@ -20,15 +20,15 @@ def server(ip, port, reliability, testcase, window_size):
     # This code runs through ports until it finds an open one
     firstPort = port  # Used to quit the program when server can't bind to a provided IP and every port from 1024-65534.
     while True:  # Loops through all ports for the given IP and binds to the first available one.
-        try:  # Used to handle exceptions when server can't bind to a port without quitting the program.
+        try:
             server_socket.bind((ip, port))  # Attempts to bind with provided IP and current port
             break  # Break out of loop if bind didn't raise an exception
-        except OSError:  # Catches exceptions when binding
+        except OSError:
             port = port + 1  # Iterates port for the next bind attempt
         if port == 65535:
-            port = 1024  # Used to run through remaining ports in the valid range.
-        elif (port == firstPort - 1):  # If the current port is the one prior to the first port, an error message
-            # is shown. It's worth noting that the last port can't be tested because of this
+            port = 1024
+        elif (port == firstPort - 1):  # raise exception when all ports are busy
+                                        #TODO: final port is never checked
             raise Exception("Could not bind to any port on IP " + str(ip))
 
     print("##### Server is up and listening on " + str(ip) + ":" + str(port))
@@ -363,8 +363,12 @@ def client(ip, port, filename, reliability, testcase, window_size):
     # Set timeout using measured RTT
     #######
     timeout_s = end_time - start_time
-    client_socket.settimeout(4 * timeout_s)
-    print("##### Timeout set to " + str(round((4 * timeout_s*1000), 2)) + "ms. RTT: " + str(round((timeout_s*1000), 2)) + "ms.")
+    if (timeout_s <= 100) :
+        client_socket.settimeout(100)
+        print("##### Timeout set to safe minimum of 100ms. RTT: " + str(round((timeout_s*1000), 2)) + "ms.")
+    else:
+        client_socket.settimeout(4 * timeout_s)
+        print("##### Timeout set to " + str(round((4 * timeout_s*1000), 2)) + "ms. RTT: " + str(round((timeout_s*1000), 2)) + "ms.")
 
     #######
     # Read and prepare the file for transfer
@@ -772,6 +776,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     file.close()
 
     print("##### Transfer complete.")
+    print("##Note: 1000 bits = 1Kb - 1000 bytes = 1KB")
     print("## Total time: " + str(round(transfer_time, 2)) + ". Size of file transferred: " + str(
         file_size / 1000) + "KB.")
     file_size = file_size * 8  ## Converting file_size to bits
@@ -793,7 +798,7 @@ def client(ip, port, filename, reliability, testcase, window_size):
     seq, ack, flags, win = parse_header(response)
 
     # Recives ACK for the FIN and closes connection
-    if flags == 6:  # If flags == ACK
+    if flags == 6:  # If flags == FIN-ACK
         client_socket.close()
         print("##### Connection closed")
 
